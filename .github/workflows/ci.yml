@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  lint-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - run: pip install -r requirements.txt
+      - run: ruff check .
+      - run: pytest -q
+
+  docker-build:
+    needs: lint-test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t forecastpilot:ci .
+
+  # ---------------------------------------------------------------
+  # W4 — Deploy to Azure Container Apps (uncomment when W3 is done)
+  # ---------------------------------------------------------------
+  # deploy:
+  #   needs: docker-build
+  #   if: github.ref == 'refs/heads/main'
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: azure/login@v2
+  #       with:
+  #         creds: ${{ secrets.AZURE_CREDENTIALS }}
+  #     - name: Build & push to ACR, then update Container App
+  #       run: |
+  #         az acr build --registry <your-acr> --image forecastpilot:${{ github.sha }} .
+  #         az containerapp update \
+  #           --name forecastpilot --resource-group <your-rg> \
+  #           --image <your-acr>.azurecr.io/forecastpilot:${{ github.sha }}
