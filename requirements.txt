@@ -5,6 +5,7 @@ numpy
 statsmodels
 yfinance
 anthropic
+python-dotenv
 pytest
 httpx
 ruff

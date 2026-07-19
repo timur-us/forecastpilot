@@ -3,11 +3,14 @@
 import os
 
 import yfinance as yf
+from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
 from app.commentary import generate_commentary
 from app.forecasting import fit_forecast
+
+load_dotenv()  # load ANTHROPIC_API_KEY (and friends) from the project-root .env
 
 app = FastAPI(
     title="ForecastPilot",
