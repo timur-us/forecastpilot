@@ -52,6 +52,24 @@ def test_all_numbers_grounded_passes_clean():
     assert result["unmatched"] == []
 
 
+def test_de_decimals_with_four_plus_places_are_not_split():
+    # Regression: "18,6936" / "13,6393" used to be cut after 3 digits,
+    # stranding "6" / "3" as bogus extra tokens.
+    payload = {
+        "last_close": 18.6936,
+        "forecast": [13.6393, 20.0],
+        "metrics": {},
+        "horizon_days": 30,
+    }
+    text = "Werte: 18,6936 und 13,6393."
+
+    result = check_numbers(text, payload)
+
+    assert result["numbers_checked"] == 2
+    assert result["unmatched"] == []
+    assert result["passed"] is True
+
+
 def test_list_markers_from_system_prompt_structure_are_ignored():
     text = (
         "1. Kursbewegung: 182.34.\n"

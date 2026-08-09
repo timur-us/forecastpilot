@@ -11,12 +11,18 @@ import re
 
 # A number token: either a group-separated number (thousands separators in
 # either convention, e.g. "1.234,56" or "1,234.56"), or a plain integer/
-# decimal (e.g. "182.34", "30", "150,25"). Currency signs ($, €, USD, EUR)
-# and "%" are deliberately left outside the match — they don't change the
-# numeric value. A negative lookbehind for letters keeps things like "Q4"
-# from being read as the number 4.
+# decimal (e.g. "182.34", "30", "150,25", "18,6936"). Currency signs ($, €,
+# USD, EUR) and "%" are deliberately left outside the match — they don't
+# change the numeric value. A negative lookbehind for letters keeps things
+# like "Q4" from being read as the number 4.
+#
+# The "(?!\d)" after \d{3} in the thousands branch matters: a group only
+# counts as a 3-digit thousands group when it isn't followed by more digits.
+# Without it, a 4+-digit decimal fraction like "18,6936" would greedily
+# match just its first 3 digits as a "thousands group" and strand the rest
+# ("6") as a separate bogus token.
 _NUMBER_RE = re.compile(
-    r"(?<![A-Za-z])[+-]?\d{1,3}(?:[.,]\d{3})+(?:[.,]\d+)?"
+    r"(?<![A-Za-z])[+-]?\d{1,3}(?:[.,]\d{3}(?!\d))+(?:[.,]\d+)?"
     r"|(?<![A-Za-z])[+-]?\d+(?:[.,]\d+)?"
 )
 
