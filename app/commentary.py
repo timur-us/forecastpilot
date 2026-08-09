@@ -2,7 +2,28 @@
 
 import os
 
+import anthropic
 from anthropic import Anthropic
+
+# Maps Anthropic SDK exception types to a short, user-facing reason string
+# used to build the "LLM call failed: <reason>" HTTP 502 detail in app.main.
+LLM_ERROR_REASONS: dict[type[Exception], str] = {
+    anthropic.AuthenticationError: "authentication",
+    anthropic.PermissionDeniedError: "insufficient credits or permissions",
+    anthropic.RateLimitError: "rate limit",
+    anthropic.APIConnectionError: "network",
+}
+
+
+def describe_llm_error(exc: anthropic.APIError) -> str:
+    """Turn an Anthropic SDK exception into a short 'LLM call failed: ...' reason."""
+    for exc_type, reason in LLM_ERROR_REASONS.items():
+        if isinstance(exc, exc_type):
+            return f"LLM call failed: {reason}"
+    if isinstance(exc, anthropic.APIStatusError):
+        return f"LLM call failed: upstream error ({exc.status_code})"
+    return "LLM call failed: unexpected error"
+
 
 SYSTEM = (
     "You are a markets analyst writing short, factual commentary for a management "

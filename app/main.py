@@ -2,12 +2,13 @@
 
 import os
 
+import anthropic
 import yfinance as yf
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
 from pydantic import BaseModel
 
-from app.commentary import generate_commentary
+from app.commentary import describe_llm_error, generate_commentary
 from app.forecasting import fit_forecast
 
 load_dotenv()  # load ANTHROPIC_API_KEY (and friends) from the project-root .env
@@ -54,13 +55,16 @@ def forecast(
             raise HTTPException(
                 status_code=503, detail="ANTHROPIC_API_KEY not configured"
             )
-        commentary_block = generate_commentary(
-            ticker=ticker,
-            metrics=result["metrics"],
-            last_close=float(series.iloc[-1]),
-            forecast=result["forecast"],
-            language=language,
-        )
+        try:
+            commentary_block = generate_commentary(
+                ticker=ticker,
+                metrics=result["metrics"],
+                last_close=float(series.iloc[-1]),
+                forecast=result["forecast"],
+                language=language,
+            )
+        except anthropic.APIError as e:
+            raise HTTPException(status_code=502, detail=describe_llm_error(e)) from e
 
     return ForecastResponse(
         ticker=ticker.upper(),
