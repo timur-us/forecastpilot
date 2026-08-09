@@ -5,6 +5,8 @@ import os
 import anthropic
 from anthropic import Anthropic
 
+from app.evals import check_numbers
+
 # Maps Anthropic SDK exception types to a short, user-facing reason string
 # used to build the "LLM call failed: <reason>" HTTP 502 detail in app.main.
 LLM_ERROR_REASONS: dict[type[Exception], str] = {
@@ -78,13 +80,19 @@ def generate_commentary(
         + msg.usage.output_tokens / 1e6 * price_output,
         6,
     )
+    text = msg.content[0].text
+    payload = {
+        "last_close": last_close,
+        "forecast": forecast,
+        "metrics": metrics,
+        "horizon_days": len(forecast),
+    }
 
     return {
-        "text": msg.content[0].text,
+        "text": text,
         "model": model,
         "input_tokens": msg.usage.input_tokens,
         "output_tokens": msg.usage.output_tokens,
         "cost_usd": cost_usd,
-        # TODO(W5): numbers-match eval guard — verify every figure in `text`
-        #           appears in the computed inputs before returning it
+        "eval": check_numbers(text, payload),
     }
