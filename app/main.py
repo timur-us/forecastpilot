@@ -6,6 +6,7 @@ import anthropic
 import yfinance as yf
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException, Query
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel
 
 from app.commentary import describe_llm_error, generate_commentary
@@ -30,6 +31,11 @@ class ForecastResponse(BaseModel):
     forecast: list[float]
     metrics: dict
     commentary: dict | None = None
+
+
+@app.get("/", include_in_schema=False)
+def root() -> RedirectResponse:
+    return RedirectResponse(url="/docs")
 
 
 @app.get("/health")
