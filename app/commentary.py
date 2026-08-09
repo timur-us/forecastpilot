@@ -53,6 +53,8 @@ def generate_commentary(
     """Generate a short management commentary grounded in the computed numbers."""
     client = Anthropic()  # reads ANTHROPIC_API_KEY from the environment
     model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
+    price_input = float(os.getenv("ANTHROPIC_PRICE_INPUT_PER_MTOK", "3.0"))
+    price_output = float(os.getenv("ANTHROPIC_PRICE_OUTPUT_PER_MTOK", "15.0"))
 
     lang = "English" if language == "en" else "German"
     prompt = (
@@ -71,12 +73,18 @@ def generate_commentary(
         messages=[{"role": "user", "content": prompt}],
     )
 
+    cost_usd = round(
+        msg.usage.input_tokens / 1e6 * price_input
+        + msg.usage.output_tokens / 1e6 * price_output,
+        6,
+    )
+
     return {
         "text": msg.content[0].text,
         "model": model,
         "input_tokens": msg.usage.input_tokens,
         "output_tokens": msg.usage.output_tokens,
-        # TODO(W5): cost estimate from configurable per-token rates
+        "cost_usd": cost_usd,
         # TODO(W5): numbers-match eval guard — verify every figure in `text`
         #           appears in the computed inputs before returning it
     }
