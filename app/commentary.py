@@ -70,7 +70,7 @@ def generate_commentary(
 
     msg = client.messages.create(
         model=model,
-        max_tokens=400,
+        max_tokens=600,
         system=SYSTEM,
         messages=[{"role": "user", "content": prompt}],
     )
