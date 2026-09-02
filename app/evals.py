@@ -26,47 +26,73 @@ _NUMBER_RE = re.compile(
     r"|(?<![A-Za-z])[+-]?\d+(?:[.,]\d+)?"
 )
 
-# app.commentary.SYSTEM enforces a fixed "1./2./3." section structure;
-# strip those list markers so they aren't mistaken for invented figures.
-_LIST_MARKER_RE = re.compile(r"(?m)^\s*[123]\.\s+")
+# app.commentary.SYSTEM enforces a fixed 3-part heading structure ("1.
+# Kursbewegung", "2. Modellgüte", ...), which commentary often renders as
+# a markdown heading or bold line (e.g. "**1. Kursbewegung**"). Strip the
+# ordinal marker at the start of such lines so it isn't read as a claimed
+# figure. Scoped to [ \t#*]* (no \s, which would cross newlines) so this
+# only ever touches a line's own leading marker, never a number that
+# opens a sentence mid-paragraph.
+_HEADING_ORDINAL_RE = re.compile(r"(?m)^[ \t#*]*\d+\.[ \t]+")
 
 _TOLERANCE = 0.01  # absolute; accounts for rounding as printed
 
 
-def _parse_number(token: str) -> float | None:
-    """Normalize a DE- or EN-formatted number token to a float."""
+def _parse_candidates(token: str) -> list[float]:
+    """Return every plausible value a DE/EN-formatted number token could mean.
+
+    Almost every token has exactly one legitimate reading. The exception:
+    a single separator followed by exactly 3 trailing digits (e.g.
+    "41,828" or "41.828") is genuinely ambiguous between the two locale
+    conventions — thousands-grouped integer (41828) or decimal fraction
+    (41.828) — there's no way to tell without knowing the writer's
+    locale, so both readings are returned; the caller accepts a match
+    against either.
+    """
     sign = ""
     if token and token[0] in "+-":
         sign, token = token[0], token[1:]
+
+    def parsed(s: str) -> float | None:
+        try:
+            return float(sign + s)
+        except ValueError:
+            return None
 
     if "," in token and "." in token:
         # Whichever separator comes last is the decimal point.
         decimal_sep = token[max(token.rfind(","), token.rfind("."))]
         thousands_sep = "." if decimal_sep == "," else ","
         token = token.replace(thousands_sep, "").replace(decimal_sep, ".")
-    elif "," in token:
-        integer_part, _, frac = token.partition(",")
-        if token.count(",") > 1 or (len(frac) == 3 and len(integer_part) <= 3):
-            token = token.replace(",", "")  # thousands grouping, e.g. "1,234"
+        value = parsed(token)
+        return [value] if value is not None else []
+
+    for sep in (",", "."):
+        if sep not in token:
+            continue
+        integer_part, _, frac = token.partition(sep)
+        if token.count(sep) == 1 and len(frac) == 3 and len(integer_part) <= 3:
+            # Ambiguous single group, e.g. "41,828" or "41.828" — offer both.
+            thousands = parsed(token.replace(sep, ""))
+            decimal = parsed(token.replace(sep, "."))
+            return [v for v in (thousands, decimal) if v is not None]
+        if token.count(sep) > 1:
+            value = parsed(token.replace(sep, ""))  # thousands grouping
         else:
-            token = token.replace(",", ".")  # decimal comma, e.g. "150,25"
-    elif token.count(".") > 1:
-        token = token.replace(".", "")  # thousands-only, e.g. "1.234.567"
-    # else: plain integer, or a single "." already valid as a decimal point
+            value = parsed(token.replace(sep, "."))  # decimal separator
+        return [value] if value is not None else []
 
-    try:
-        return float(sign + token)
-    except ValueError:
-        return None
+    value = parsed(token)  # plain integer
+    return [value] if value is not None else []
 
 
-def _extract_numbers(text: str) -> list[tuple[str, float]]:
-    text = _LIST_MARKER_RE.sub("", text)
+def _extract_numbers(text: str) -> list[tuple[str, list[float]]]:
+    text = _HEADING_ORDINAL_RE.sub("", text)
     found = []
     for match in _NUMBER_RE.finditer(text):
-        value = _parse_number(match.group())
-        if value is not None:
-            found.append((match.group(), value))
+        candidates = _parse_candidates(match.group())
+        if candidates:
+            found.append((match.group(), candidates))
     return found
 
 
@@ -107,8 +133,8 @@ def check_numbers(text: str, payload: dict) -> dict:
 
     unmatched = [
         token
-        for token, value in extracted
-        if not any(abs(value - a) <= _TOLERANCE for a in allowed)
+        for token, candidates in extracted
+        if not any(abs(c - a) <= _TOLERANCE for c in candidates for a in allowed)
     ]
 
     return {

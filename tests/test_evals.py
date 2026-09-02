@@ -81,3 +81,85 @@ def test_list_markers_from_system_prompt_structure_are_ignored():
 
     assert result["unmatched"] == []
     assert result["numbers_checked"] == 1
+
+
+def test_markdown_bold_numbered_headings_are_not_extracted_as_values():
+    # Regression: German commentary renders the fixed 3-part structure as
+    # bold markdown headings ("**1. Kursbewegung**"), which the old
+    # line-start-only marker regex didn't recognize (it required plain
+    # whitespace before the digit, not "**"), so the ordinals 1/2/3 leaked
+    # through as unmatched "invented" numbers.
+    payload = {
+        "last_close": 182.34,
+        "forecast": [1200.0, 1350.5],
+        "metrics": {"mae_naive": 41.828, "beats_naive": True, "backtest_horizon": 30},
+        "horizon_days": 30,
+    }
+    text = (
+        "**1. Kursbewegung**\n"
+        "Der Schlusskurs liegt bei 182,34 EUR, die Prognose reicht bis "
+        "1.350,50 EUR.\n"
+        "**2. Modellgüte**\n"
+        "Die mittlere Abweichung des naiven Modells liegt bei 41,828 EUR "
+        "über 30 Tage.\n"
+        "**3. Einschränkung**\n"
+        "Bildungsanalyse — keine Anlageberatung."
+    )
+
+    result = check_numbers(text, payload)
+
+    assert "1" not in result["unmatched"]
+    assert "2" not in result["unmatched"]
+    assert "3" not in result["unmatched"]
+    assert result["numbers_checked"] == 4  # headings excluded entirely
+    assert result["unmatched"] == []
+    assert result["passed"] is True
+
+
+def test_ambiguous_de_comma_number_matches_via_decimal_reading():
+    # "41,828" could be thousands (41828) or a 3-decimal fraction
+    # (41.828); the payload only has the decimal reading, so it must
+    # still count as matched, not unmatched.
+    payload = {
+        "last_close": 0,
+        "forecast": [],
+        "metrics": {"mae_naive": 41.828},
+        "horizon_days": 0,
+    }
+
+    result = check_numbers("MAE 41,828 EUR.", payload)
+
+    assert "41,828" not in result["unmatched"]
+    assert result["numbers_matched"] == 1
+    assert result["passed"] is True
+
+
+def test_ambiguous_dot_number_matches_via_thousands_reading():
+    # Same ambiguity, mirrored: "41.828" (with a point) against a payload
+    # value of 41828 proves the thousands reading is also generated, not
+    # just the decimal one.
+    payload = {
+        "last_close": 0,
+        "forecast": [],
+        "metrics": {"volume": 41828},
+        "horizon_days": 0,
+    }
+
+    result = check_numbers("Volumen: 41.828 Stück.", payload)
+
+    assert "41.828" not in result["unmatched"]
+    assert result["numbers_matched"] == 1
+    assert result["passed"] is True
+
+
+def test_invented_ambiguous_number_still_fails_both_readings():
+    # The guard must keep catching real hallucinations: an ambiguous-shaped
+    # invented number ("77,777") matches neither its thousands (77777) nor
+    # its decimal (77.777) reading against this payload, so it must still
+    # land in unmatched.
+    text = "Fantasiewert: 77,777 EUR."
+
+    result = check_numbers(text, PAYLOAD)
+
+    assert result["unmatched"] == ["77,777"]
+    assert result["passed"] is False
