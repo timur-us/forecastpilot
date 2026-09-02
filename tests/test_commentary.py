@@ -20,6 +20,7 @@ class _FakeClient:
 
 def test_cost_usd_uses_default_pricing(monkeypatch):
     monkeypatch.setattr(commentary, "Anthropic", _FakeClient)
+    monkeypatch.setenv("COMMENTARY_CACHE_ENABLED", "false")
     monkeypatch.delenv("ANTHROPIC_PRICE_INPUT_PER_MTOK", raising=False)
     monkeypatch.delenv("ANTHROPIC_PRICE_OUTPUT_PER_MTOK", raising=False)
 
@@ -36,6 +37,7 @@ def test_cost_usd_uses_default_pricing(monkeypatch):
 
 def test_cost_usd_respects_env_pricing(monkeypatch):
     monkeypatch.setattr(commentary, "Anthropic", _FakeClient)
+    monkeypatch.setenv("COMMENTARY_CACHE_ENABLED", "false")
     monkeypatch.setenv("ANTHROPIC_PRICE_INPUT_PER_MTOK", "10")
     monkeypatch.setenv("ANTHROPIC_PRICE_OUTPUT_PER_MTOK", "20")
 

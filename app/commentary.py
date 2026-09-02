@@ -5,6 +5,7 @@ import os
 import anthropic
 from anthropic import Anthropic
 
+from app import cache
 from app.evals import check_numbers
 
 # Maps Anthropic SDK exception types to a short, user-facing reason string
@@ -52,7 +53,16 @@ def generate_commentary(
     forecast: list,
     language: str = "en",
 ) -> dict:
-    """Generate a short management commentary grounded in the computed numbers."""
+    """Generate a short management commentary grounded in the computed numbers.
+
+    Cached per (ticker, language, horizon) for the rest of the UTC day —
+    see app.cache.
+    """
+    horizon_days = len(forecast)
+    cached = cache.get(ticker, language, horizon_days)
+    if cached is not None:
+        return {**cached, "cached": True}
+
     client = Anthropic()  # reads ANTHROPIC_API_KEY from the environment
     model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
     price_input = float(os.getenv("ANTHROPIC_PRICE_INPUT_PER_MTOK", "3.0"))
@@ -85,10 +95,10 @@ def generate_commentary(
         "last_close": last_close,
         "forecast": forecast,
         "metrics": metrics,
-        "horizon_days": len(forecast),
+        "horizon_days": horizon_days,
     }
 
-    return {
+    result = {
         "text": text,
         "model": model,
         "input_tokens": msg.usage.input_tokens,
@@ -96,3 +106,5 @@ def generate_commentary(
         "cost_usd": cost_usd,
         "eval": check_numbers(text, payload),
     }
+    cache.set(ticker, language, horizon_days, result)
+    return {**result, "cached": False}
