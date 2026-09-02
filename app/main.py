@@ -5,9 +5,12 @@ import os
 import anthropic
 import yfinance as yf
 from dotenv import load_dotenv
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import RedirectResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from app.commentary import describe_llm_error, generate_commentary
 from app.forecasting import fit_forecast
@@ -22,6 +25,41 @@ app = FastAPI(
         "Educational project — not investment advice."
     ),
 )
+
+# key_style="endpoint" pools requests by (client, route) regardless of the
+# ticker in the URL — the default "url" style would give every ticker its
+# own bucket, making the limit trivially bypassable by varying the ticker.
+limiter = Limiter(key_func=get_remote_address, key_style="endpoint")
+app.state.limiter = limiter
+
+
+def _handle_rate_limit_exceeded(request: Request, exc: RateLimitExceeded) -> JSONResponse:
+    response = JSONResponse(
+        status_code=429, content={"detail": f"Rate limit exceeded: {exc.detail}"}
+    )
+    return limiter._inject_headers(response, request.state.view_rate_limit)
+
+
+app.add_exception_handler(RateLimitExceeded, _handle_rate_limit_exceeded)
+
+
+def _forecast_rate_limit() -> str:
+    return os.getenv("RATE_LIMIT_FORECAST", "30/hour")
+
+
+def _commentary_rate_limit() -> str:
+    return os.getenv("RATE_LIMIT_COMMENTARY", "5/hour")
+
+
+def _wants_commentary(request: Request) -> bool:
+    """Read the raw `commentary` query param.
+
+    slowapi's exempt_when only gets the raw Request (not the endpoint's
+    parsed keyword arguments), so this re-parses the same truthy values
+    FastAPI/pydantic accept for a bool query param.
+    """
+    raw = request.query_params.get("commentary", "")
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 class ForecastResponse(BaseModel):
@@ -44,7 +82,10 @@ def health() -> dict:
 
 
 @app.get("/forecast/{ticker}", response_model=ForecastResponse)
+@limiter.limit(_commentary_rate_limit, exempt_when=lambda request: not _wants_commentary(request))
+@limiter.limit(_forecast_rate_limit, exempt_when=_wants_commentary)
 def forecast(
+    request: Request,
     ticker: str,
     horizon: int = Query(default=30, ge=5, le=90),
     commentary: bool = Query(
