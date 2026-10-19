@@ -1,6 +1,7 @@
 """LLM commentary layer — Claude via the Anthropic API, with token tracking."""
 
 import os
+from datetime import datetime, timezone
 
 import anthropic
 from anthropic import Anthropic
@@ -53,6 +54,11 @@ SYSTEM = (
 )
 
 
+def _fingerprint(last_close: float, forecast: list) -> tuple[str, str, str]:
+    """The numbers the prompt cites verbatim, formatted as the prompt does."""
+    return (f"{last_close:.2f}", f"{forecast[0]:.2f}", f"{forecast[-1]:.2f}")
+
+
 def generate_commentary(
     ticker: str,
     metrics: dict,
@@ -62,13 +68,28 @@ def generate_commentary(
 ) -> dict:
     """Generate a short management commentary grounded in the computed numbers.
 
-    Cached per (ticker, language, horizon) for the rest of the UTC day —
-    see app.cache.
+    Cached for the rest of the UTC day per (ticker, language, horizon) and
+    the numbers the text cites — see app.cache. On a cache hit the numbers
+    check runs against the current payload, so `eval` always describes the
+    response it is part of.
     """
     horizon_days = len(forecast)
-    cached = cache.get(ticker, language, horizon_days)
+    payload = {
+        "last_close": last_close,
+        "forecast": forecast,
+        "metrics": metrics,
+        "horizon_days": horizon_days,
+    }
+    fingerprint = _fingerprint(last_close, forecast)
+    cached = cache.get(ticker, language, horizon_days, fingerprint)
     if cached is not None:
-        return {**cached, "cached": True}
+        # The cited numbers are unchanged; the backtest metrics may differ
+        # slightly between fits, so judge the text against this payload.
+        return {
+            **cached,
+            "eval": check_numbers(cached["text"], payload),
+            "cached": True,
+        }
 
     client = Anthropic()  # reads ANTHROPIC_API_KEY from the environment
     model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
@@ -104,12 +125,6 @@ def generate_commentary(
     ).strip()
     if not text:
         raise CommentaryError("empty response")
-    payload = {
-        "last_close": last_close,
-        "forecast": forecast,
-        "metrics": metrics,
-        "horizon_days": horizon_days,
-    }
 
     result = {
         "text": text,
@@ -118,6 +133,7 @@ def generate_commentary(
         "output_tokens": msg.usage.output_tokens,
         "cost_usd": cost_usd,
         "eval": check_numbers(text, payload),
+        "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
-    cache.set(ticker, language, horizon_days, result)
+    cache.set(ticker, language, horizon_days, fingerprint, result)
     return {**result, "cached": False}
