@@ -55,3 +55,28 @@ def test_plain_forecast_limit_is_independent_of_commentary_limit(monkeypatch):
     # Plain forecasts (no commentary) still have their own untouched budget.
     plain = [client.get("/forecast/AAPL") for _ in range(2)]
     assert all(r.status_code == 200 for r in plain)
+
+
+def test_commentary_limit_is_per_caller_behind_trusted_proxy(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_COMMENTARY", "3/hour")
+    monkeypatch.setenv("TRUSTED_PROXY_CIDRS", "100.64.0.0/10")
+    monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
+    _mock_series(monkeypatch)
+    # Every request arrives from the ingress; X-Forwarded-For names the caller.
+    proxied = TestClient(app, client=("100.100.0.9", 40000))
+    params = {"commentary": True}
+    caller_a = {"X-Forwarded-For": "203.0.113.5"}
+    caller_b = {"X-Forwarded-For": "198.51.100.7"}
+    spoofed_by_a = {"X-Forwarded-For": "198.51.100.7, 203.0.113.5"}
+
+    allowed = [
+        proxied.get("/forecast/AAPL", params=params, headers=caller_a) for _ in range(3)
+    ]
+    blocked = proxied.get("/forecast/AAPL", params=params, headers=caller_a)
+    still_blocked = proxied.get("/forecast/AAPL", params=params, headers=spoofed_by_a)
+    other = proxied.get("/forecast/AAPL", params=params, headers=caller_b)
+
+    assert all(r.status_code == 503 for r in allowed)
+    assert blocked.status_code == 429
+    assert still_blocked.status_code == 429  # the ingress-appended address wins
+    assert other.status_code == 503  # a different caller has its own budget

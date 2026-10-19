@@ -116,6 +116,7 @@ A daily Holt-Winters forecast often does not beat the naive baseline over a few 
 ### Rate limits and caching
 
 - Plain forecasts: `30/hour` per client; forecasts with commentary: `5/hour` per client (each one is a paid LLM call). Both are configurable, see below.
+- The client is the caller's address. Behind the Azure Container Apps ingress it is taken from `X-Forwarded-For`, trusting only hops from the ingress network (`TRUSTED_PROXY_CIDRS`); entries a caller adds itself are never used.
 - Commentary is cached in-process until UTC midnight, keyed by ticker, language, horizon and the numbers the text cites (last close, forecast start and end). A price move during the trading day therefore yields fresh text; unchanged numbers reuse the block.
 - With `cached: true`, `model`, `input_tokens`, `output_tokens`, `cost_usd` and `generated_at` refer to the original generation (no new LLM call); `eval` is recomputed against the response it is part of.
 
@@ -132,6 +133,7 @@ Copy `.env.example` to `.env` for local runs. In production the key is an Azure 
 | `RATE_LIMIT_FORECAST` | `30/hour` | Per-client limit for plain forecasts |
 | `RATE_LIMIT_COMMENTARY` | `5/hour` | Per-client limit for forecasts with commentary |
 | `COMMENTARY_CACHE_ENABLED` | `true` | `false` always calls the LLM |
+| `TRUSTED_PROXY_CIDRS` | — | Networks of trusted reverse proxies; production sets `100.64.0.0/10` (Container Apps ingress) |
 
 Pricing source: https://platform.claude.com/docs/en/about-claude/pricing
 
