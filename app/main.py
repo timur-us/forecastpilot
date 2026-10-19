@@ -12,7 +12,7 @@ from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
 from slowapi.util import get_remote_address
 
-from app.commentary import describe_llm_error, generate_commentary
+from app.commentary import CommentaryError, describe_llm_error, generate_commentary
 from app.forecasting import fit_forecast
 
 load_dotenv()  # load ANTHROPIC_API_KEY (and friends) from the project-root .env
@@ -110,7 +110,7 @@ def forecast(
                 forecast=result["forecast"],
                 language=language,
             )
-        except anthropic.APIError as e:
+        except (anthropic.APIError, CommentaryError) as e:
             raise HTTPException(status_code=502, detail=describe_llm_error(e)) from e
 
     return ForecastResponse(

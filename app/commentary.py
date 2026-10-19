@@ -8,6 +8,11 @@ from anthropic import Anthropic
 from app import cache
 from app.evals import check_numbers
 
+
+class CommentaryError(RuntimeError):
+    """The model response could not be turned into commentary text."""
+
+
 # Maps Anthropic SDK exception types to a short, user-facing reason string
 # used to build the "LLM call failed: <reason>" HTTP 502 detail in app.main.
 LLM_ERROR_REASONS: dict[type[Exception], str] = {
@@ -18,8 +23,10 @@ LLM_ERROR_REASONS: dict[type[Exception], str] = {
 }
 
 
-def describe_llm_error(exc: anthropic.APIError) -> str:
-    """Turn an Anthropic SDK exception into a short 'LLM call failed: ...' reason."""
+def describe_llm_error(exc: Exception) -> str:
+    """Map an SDK or commentary exception to a short 'LLM call failed: ...' reason."""
+    if isinstance(exc, CommentaryError):
+        return f"LLM call failed: {exc}"
     for exc_type, reason in LLM_ERROR_REASONS.items():
         if isinstance(exc, exc_type):
             return f"LLM call failed: {reason}"
@@ -90,7 +97,13 @@ def generate_commentary(
         + msg.usage.output_tokens / 1e6 * price_output,
         6,
     )
-    text = msg.content[0].text
+    # Responses may interleave thinking blocks with text; the commentary is the
+    # concatenation of all text blocks.
+    text = "".join(
+        block.text for block in msg.content if getattr(block, "type", None) == "text"
+    ).strip()
+    if not text:
+        raise CommentaryError("empty response")
     payload = {
         "last_close": last_close,
         "forecast": forecast,
