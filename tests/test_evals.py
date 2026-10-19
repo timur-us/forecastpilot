@@ -152,6 +152,22 @@ def test_ambiguous_dot_number_matches_via_thousands_reading():
     assert result["passed"] is True
 
 
+def test_one_step_rounding_difference_is_within_tolerance():
+    # 1.01 vs 1.02 differ by exactly the tolerance; float arithmetic yields
+    # 0.010000000000000009, which must still count as matched.
+    payload = {
+        "last_close": 0,
+        "forecast": [],
+        "metrics": {"mape_model_pct": 1.02},
+        "horizon_days": 0,
+    }
+
+    result = check_numbers("MAPE 1.01%.", payload)
+
+    assert result["unmatched"] == []
+    assert result["passed"] is True
+
+
 def test_invented_ambiguous_number_still_fails_both_readings():
     # The guard must keep catching real hallucinations: an ambiguous-shaped
     # invented number ("77,777") matches neither its thousands (77777) nor

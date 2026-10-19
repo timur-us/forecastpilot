@@ -36,6 +36,9 @@ _NUMBER_RE = re.compile(
 _HEADING_ORDINAL_RE = re.compile(r"(?m)^[ \t#*]*\d+\.[ \t]+")
 
 _TOLERANCE = 0.01  # absolute; accounts for rounding as printed
+# Float arithmetic turns an exact one-step difference such as 1.01 vs 1.02
+# into 0.010000000000000009; the slack keeps it inside the tolerance.
+_FLOAT_SLACK = 1e-9
 
 
 def _parse_candidates(token: str) -> list[float]:
@@ -134,7 +137,9 @@ def check_numbers(text: str, payload: dict) -> dict:
     unmatched = [
         token
         for token, candidates in extracted
-        if not any(abs(c - a) <= _TOLERANCE for c in candidates for a in allowed)
+        if not any(
+            abs(c - a) <= _TOLERANCE + _FLOAT_SLACK for c in candidates for a in allowed
+        )
     ]
 
     return {
