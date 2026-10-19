@@ -10,8 +10,8 @@ from fastapi.responses import JSONResponse, RedirectResponse
 from pydantic import BaseModel
 from slowapi import Limiter
 from slowapi.errors import RateLimitExceeded
-from slowapi.util import get_remote_address
 
+from app.clientip import client_ip
 from app.commentary import CommentaryError, describe_llm_error, generate_commentary
 from app.forecasting import fit_forecast
 
@@ -29,7 +29,8 @@ app = FastAPI(
 # key_style="endpoint" pools requests by (client, route) regardless of the
 # ticker in the URL — the default "url" style would give every ticker its
 # own bucket, making the limit trivially bypassable by varying the ticker.
-limiter = Limiter(key_func=get_remote_address, key_style="endpoint")
+# client_ip resolves the caller behind a trusted reverse proxy (app.clientip).
+limiter = Limiter(key_func=client_ip, key_style="endpoint")
 app.state.limiter = limiter
 
 

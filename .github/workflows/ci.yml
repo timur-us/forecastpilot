@@ -40,6 +40,8 @@ jobs:
       ANTHROPIC_MODEL: claude-sonnet-5-5
       ANTHROPIC_PRICE_INPUT_PER_MTOK: "2.0"
       ANTHROPIC_PRICE_OUTPUT_PER_MTOK: "10.0"
+      # Container Apps ingress network; its X-Forwarded-For identifies the caller.
+      TRUSTED_PROXY_CIDRS: 100.64.0.0/10
     steps:
       - uses: actions/checkout@v4
       - name: Build image
@@ -59,4 +61,5 @@ jobs:
             --set-env-vars \
               ANTHROPIC_MODEL=${{ env.ANTHROPIC_MODEL }} \
               ANTHROPIC_PRICE_INPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_INPUT_PER_MTOK }} \
-              ANTHROPIC_PRICE_OUTPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_OUTPUT_PER_MTOK }}
+              ANTHROPIC_PRICE_OUTPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_OUTPUT_PER_MTOK }} \
+              TRUSTED_PROXY_CIDRS=${{ env.TRUSTED_PROXY_CIDRS }}
