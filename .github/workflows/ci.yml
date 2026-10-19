@@ -33,6 +33,13 @@ jobs:
     needs: [lint-test, docker-build]
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    # Model and pricing used in production, versioned here and applied on
+    # every deploy. The API key stays an Azure secret (anthropic-api-key)
+    # referenced by the existing ANTHROPIC_API_KEY variable of the app.
+    env:
+      ANTHROPIC_MODEL: claude-sonnet-5-5
+      ANTHROPIC_PRICE_INPUT_PER_MTOK: "2.0"
+      ANTHROPIC_PRICE_OUTPUT_PER_MTOK: "10.0"
     steps:
       - uses: actions/checkout@v4
       - name: Build image
@@ -48,4 +55,8 @@ jobs:
         run: |
           az containerapp update \
             -n forecastpilot -g forecastpilot-rg \
-            --image ca06d26caabdacr.azurecr.io/forecastpilot:${{ github.sha }}
+            --image ca06d26caabdacr.azurecr.io/forecastpilot:${{ github.sha }} \
+            --set-env-vars \
+              ANTHROPIC_MODEL=${{ env.ANTHROPIC_MODEL }} \
+              ANTHROPIC_PRICE_INPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_INPUT_PER_MTOK }} \
+              ANTHROPIC_PRICE_OUTPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_OUTPUT_PER_MTOK }}

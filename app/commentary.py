@@ -71,9 +71,9 @@ def generate_commentary(
         return {**cached, "cached": True}
 
     client = Anthropic()  # reads ANTHROPIC_API_KEY from the environment
-    model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-6")
-    price_input = float(os.getenv("ANTHROPIC_PRICE_INPUT_PER_MTOK", "3.0"))
-    price_output = float(os.getenv("ANTHROPIC_PRICE_OUTPUT_PER_MTOK", "15.0"))
+    model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
+    price_input = float(os.getenv("ANTHROPIC_PRICE_INPUT_PER_MTOK", "2.0"))
+    price_output = float(os.getenv("ANTHROPIC_PRICE_OUTPUT_PER_MTOK", "10.0"))
 
     lang = "English" if language == "en" else "German"
     prompt = (

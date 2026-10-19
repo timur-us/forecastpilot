@@ -56,8 +56,17 @@ def test_cost_usd_uses_default_pricing(monkeypatch):
 
     result = _call()
 
-    # 1000/1e6 * 3.0 + 2000/1e6 * 15.0 = 0.003 + 0.03
-    assert result["cost_usd"] == 0.033
+    # 1000/1e6 * 2.0 + 2000/1e6 * 10.0 = 0.002 + 0.02
+    assert result["cost_usd"] == 0.022
+
+
+def test_default_model_is_claude_sonnet_5_5(monkeypatch):
+    _install_client(monkeypatch)
+    monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
+
+    result = _call()
+
+    assert result["model"] == "claude-sonnet-5-5"
 
 
 def test_cost_usd_respects_env_pricing(monkeypatch):
