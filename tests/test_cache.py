@@ -12,7 +12,7 @@ class _CountingMessages:
     def create(self, **kwargs):
         self.calls += 1
         return SimpleNamespace(
-            content=[SimpleNamespace(text=f"Commentary #{self.calls}.")],
+            content=[SimpleNamespace(type="text", text=f"Commentary #{self.calls}.")],
             usage=SimpleNamespace(input_tokens=100, output_tokens=200),
         )
 
