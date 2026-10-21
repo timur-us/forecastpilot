@@ -1,0 +1,9 @@
+# Keep the build context to what the image needs (requirements.txt, app/).
+.venv
+.git
+.env
+tests
+__pycache__
+**/__pycache__
+.ruff_cache
+.pytest_cache

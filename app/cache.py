@@ -5,9 +5,11 @@ numbers the commentary cites (last close, forecast start and end), so cached
 text is reused only while those numbers are unchanged — a price move during
 the trading day yields fresh commentary instead of text about older prices.
 
-Plain dict + timestamps, no external deps, no Redis. Cache is per-process:
-with scale-to-zero and a single replica this is intentional and sufficient
-— a cold start just means the first request of the day recomputes.
+Plain dict + timestamps, no external deps, no Redis. The cache is per
+process, which is intentional with scale-to-zero: a cold start means the
+first request of the day recomputes, and when the app scales out to several
+replicas each one fills its own cache, at most one extra LLM call per
+replica and day.
 """
 
 import os

@@ -24,15 +24,27 @@ Built to demonstrate end-to-end ML & GenAI engineering: model serving, container
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    C["Client · GET /forecast/{ticker}"] --> I
+    subgraph ACA["Azure Container Apps · scale-to-zero"]
+        I["Azure ingress · HTTPS"] --> R["FastAPI · rate limit per client<br/>30/h forecast · 5/h commentary"]
+        R --> F["Forecasting<br/>Holt-Winters + naive backtest"]
+        F --> D["Data layer<br/>yfinance · 2y daily closes"]
+        F --> L["Claude commentary<br/>cache · cost · numbers-match eval"]
+    end
+    D --> Y["Yahoo Finance"]
+    L --> A["Anthropic API"]
 ```
-Client → FastAPI (/forecast) → Data layer (yfinance, ~2y of daily closes)
-                             → Forecasting (statsmodels Holt-Winters + naive-baseline backtest)
-                             → Claude commentary (Anthropic API, claude-sonnet-5-5)
-                               → numbers-match eval, token/cost tracking, daily in-process cache
 
-CI/CD:         GitHub Actions — lint → test → build → deploy on push to main
-Infra:         Azure Container Apps (scale-to-zero, single replica), image in Azure Container Registry
-Observability: Container console logs in Log Analytics; per-request token, cost and eval fields
+Infrastructure: Azure Container Apps (scale 0–10 replicas, single-revision mode), image in Azure Container Registry, container console logs in Log Analytics. Every commentary response carries its own token, cost, eval and truncation fields.
+
+Deployment pipeline (`.github/workflows/ci.yml`):
+
+```mermaid
+flowchart LR
+    P["Push to main"] --> T["ruff + pytest"] --> B["Docker build"]
+    B --> R["Push to ACR<br/>tag = commit SHA"] --> U["az containerapp update"]
 ```
 
 ## API
@@ -175,10 +187,13 @@ Every push to `main` runs `.github/workflows/ci.yml`: `ruff check` and `pytest` 
 ## Roadmap
 
 - [x] **W1–2** Core service local — API, forecasting, LLM layer, tests, Docker
-- [x] **W3** Azure Container Apps deploy (manual first; Bicep still open)
+- [x] **W3** Azure Container Apps deploy
+- [ ] **W3** Infrastructure as code (Bicep)
 - [x] **W4** CI/CD — GitHub Actions deploys on push to `main`
-- [x] **W5** Observability — token/cost metrics, LLM eval suite (numbers-match guard); App Insights still open
-- [x] **W6** Polish — live demo URL (architecture diagram and screenshots still open)
+- [x] **W5** Observability — token/cost metrics, LLM eval guard (numbers-match)
+- [ ] **W5** Application Insights
+- [x] **W6** Polish — live demo URL, architecture diagram
+- [ ] **W6** Screenshots
 - [ ] **W7** RAG add-on — commentary grounded in uploaded reports, with citations
 
 ## Cost controls
