@@ -54,6 +54,14 @@ SYSTEM = (
 )
 
 
+# Hard limit on thinking plus reply. Claude Sonnet 5.5 thinks adaptively and
+# those tokens count toward max_tokens even though they are not returned
+# (platform.claude.com/docs/en/build-with-claude/thinking), so the budget
+# leaves ample room beyond the ~150-word commentary (German runs to ~450
+# tokens). Only generated tokens are billed, not the limit.
+MAX_TOKENS = 2048
+
+
 def _fingerprint(last_close: float, forecast: list) -> tuple[str, str, str]:
     """The numbers the prompt cites verbatim, formatted as the prompt does."""
     return (f"{last_close:.2f}", f"{forecast[0]:.2f}", f"{forecast[-1]:.2f}")
@@ -108,7 +116,7 @@ def generate_commentary(
 
     msg = client.messages.create(
         model=model,
-        max_tokens=600,
+        max_tokens=MAX_TOKENS,
         system=SYSTEM,
         messages=[{"role": "user", "content": prompt}],
     )
@@ -123,9 +131,16 @@ def generate_commentary(
     text = "".join(
         block.text for block in msg.content if getattr(block, "type", None) == "text"
     ).strip()
+    if msg.stop_reason == "refusal":
+        # Partial output of a refused request is incomplete by definition.
+        raise CommentaryError("refusal")
     if not text:
-        raise CommentaryError("empty response")
+        raise CommentaryError(f"empty response (stop_reason={msg.stop_reason})")
 
+    # A reply cut off at the token budget is returned as is and flagged. Only
+    # complete replies (end_turn) enter the cache, so the next request tries
+    # again instead of repeating a partial text until midnight.
+    truncated = msg.stop_reason == "max_tokens"
     result = {
         "text": text,
         "model": model,
@@ -133,7 +148,10 @@ def generate_commentary(
         "output_tokens": msg.usage.output_tokens,
         "cost_usd": cost_usd,
         "eval": check_numbers(text, payload),
+        "stop_reason": msg.stop_reason,
+        "truncated": truncated,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
-    cache.set(ticker, language, horizon_days, fingerprint, result)
+    if msg.stop_reason == "end_turn":
+        cache.set(ticker, language, horizon_days, fingerprint, result)
     return {**result, "cached": False}
