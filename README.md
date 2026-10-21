@@ -24,15 +24,27 @@ Built to demonstrate end-to-end ML & GenAI engineering: model serving, container
 
 ## Architecture
 
+```mermaid
+flowchart TB
+    C["Client · GET /forecast/{ticker}"] --> I
+    subgraph ACA["Azure Container Apps · scale-to-zero"]
+        I["Azure ingress · HTTPS"] --> R["FastAPI · rate limit per client<br/>30/h forecast · 5/h commentary"]
+        R --> F["Forecasting<br/>Holt-Winters + naive backtest"]
+        F --> D["Data layer<br/>yfinance · 2y daily closes"]
+        F --> L["Claude commentary<br/>cache · cost · numbers-match eval"]
+    end
+    D --> Y["Yahoo Finance"]
+    L --> A["Anthropic API"]
 ```
-Client → FastAPI (/forecast) → Data layer (yfinance, ~2y of daily closes)
-                             → Forecasting (statsmodels Holt-Winters + naive-baseline backtest)
-                             → Claude commentary (Anthropic API, claude-sonnet-5-5)
-                               → numbers-match eval, token/cost tracking, daily in-process cache
 
-CI/CD:         GitHub Actions — lint → test → build → deploy on push to main
-Infra:         Azure Container Apps (scale-to-zero, single replica), image in Azure Container Registry
-Observability: Container console logs in Log Analytics; per-request token, cost and eval fields
+Infrastructure: Azure Container Apps (scale 0–10 replicas, single-revision mode), image in Azure Container Registry, container console logs in Log Analytics. Every commentary response carries its own token, cost, eval and truncation fields.
+
+Deployment pipeline (`.github/workflows/ci.yml`):
+
+```mermaid
+flowchart LR
+    P["Push to main"] --> T["ruff + pytest"] --> B["Docker build"]
+    B --> R["Push to ACR<br/>tag = commit SHA"] --> U["az containerapp update"]
 ```
 
 ## API
@@ -63,45 +75,45 @@ The `eval` block is the numbers-match guard: every number in the text is traced 
 
 ### Example
 
-`GET /forecast/SAP.DE?horizon=5&commentary=true&language=en` — a live response from the deployed service (2026-10-19, recorded before `stop_reason` and `truncated` were added), shortened:
+`GET /forecast/SAP.DE?horizon=5&commentary=true&language=de` — a live response from the deployed service (2026-10-21), shortened:
 
 ```json
 {
   "ticker": "SAP.DE",
   "horizon_days": 5,
-  "last_close": 199.22,
-  "forecast": [199.31, 199.3, 199.29, 199.27, 199.26],
+  "last_close": 201.55,
+  "forecast": [201.44, 201.43, 201.42, 201.41, 201.4],
   "metrics": {
     "backtest_horizon": 5,
-    "mae_model": 6.8767,
-    "mae_naive": 6.37,
-    "mape_model_pct": 3.46,
+    "mae_model": 2.7679,
+    "mae_naive": 2.616,
+    "mape_model_pct": 1.38,
     "beats_naive": false
   },
   "commentary": {
-    "text": "**SAP.DE – Commentary** … (rendered below)",
+    "text": "**Kursbewegung:** SAP.DE schloss zuletzt bei 201,55. … (rendered below)",
     "model": "claude-sonnet-5-5",
     "input_tokens": 462,
-    "output_tokens": 284,
-    "cost_usd": 0.003764,
+    "output_tokens": 362,
+    "cost_usd": 0.004544,
     "eval": {"numbers_checked": 8, "numbers_matched": 8, "unmatched": [], "passed": true},
-    "generated_at": "2026-10-19T22:11:51+00:00",
+    "stop_reason": "end_turn",
+    "truncated": false,
+    "generated_at": "2026-10-21T23:19:45+00:00",
     "cached": false
   }
 }
 ```
 
-The commentary text, rendered:
+The commentary text (`language=de`), rendered:
 
-> **SAP.DE – Commentary**
+> **Kursbewegung:** SAP.DE schloss zuletzt bei 201,55. Die Prognose startet bei 201,44 und endet nach 5 Handelstagen bei 201,40. Das entspricht einer praktisch unveränderten Kursentwicklung.
 >
-> **Price movement:** The last close was 199.22. The forecast starts at 199.31 and ends at 199.26 after 5 trading days, which is essentially flat.
+> **Modellgüte:** Im Backtest (Horizont: 5 Tage) liegt der mittlere absolute Fehler des Modells bei 2,7679, der des naiven Vergleichsmodells bei 2,616. Der MAPE des Modells beträgt 1,38 %. Das Modell schlägt die naive Baseline nicht (beats_naive: False).
 >
-> **Model quality:** The backtest over a 5-day horizon shows a model MAE of 6.8767 against a naive baseline MAE of 6.37, with a MAPE of 3.46%. The model does not beat the naive baseline (beats_naive: False), so it adds no demonstrated accuracy over simply carrying the last value forward.
+> **Einschränkung:** Die Prognose deutet keine nennenswerte Kursänderung an. Da das Modell im Backtest nicht besser abschneidet als die naive Fortschreibung, hat sie nur begrenzten Zusatznutzen. Sie ist keine Aussage über tatsächliche künftige Kurse oder Risiken.
 >
-> **Interpretation:** The forecast implies no meaningful directional change. Given that the model underperformed the naive baseline, it should be treated as a weak signal. The backtest error is far larger than the forecast's movement, so the forecast does not support a directional view or trading decision.
->
-> *Educational analysis — not investment advice.*
+> Bildungsanalyse — keine Anlageberatung.
 
 A daily Holt-Winters forecast often does not beat the naive baseline over a few trading days; the example shows this deliberately. The point of the service is the transparent pipeline around the forecast — backtest metrics, a commentary that only uses the computed numbers, and a check that proves it.
 
@@ -175,10 +187,13 @@ Every push to `main` runs `.github/workflows/ci.yml`: `ruff check` and `pytest` 
 ## Roadmap
 
 - [x] **W1–2** Core service local — API, forecasting, LLM layer, tests, Docker
-- [x] **W3** Azure Container Apps deploy (manual first; Bicep still open)
+- [x] **W3** Azure Container Apps deploy
+- [ ] **W3** Infrastructure as code (Bicep)
 - [x] **W4** CI/CD — GitHub Actions deploys on push to `main`
-- [x] **W5** Observability — token/cost metrics, LLM eval suite (numbers-match guard); App Insights still open
-- [x] **W6** Polish — live demo URL (architecture diagram and screenshots still open)
+- [x] **W5** Observability — token/cost metrics, LLM eval guard (numbers-match)
+- [ ] **W5** Application Insights
+- [x] **W6** Polish — live demo URL, architecture diagram
+- [ ] **W6** Screenshots
 - [ ] **W7** RAG add-on — commentary grounded in uploaded reports, with citations
 
 ## Cost controls
