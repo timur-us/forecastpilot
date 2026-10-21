@@ -55,13 +55,15 @@ Response fields:
 
 - `ticker`, `horizon_days`, `last_close`, `forecast` (one value per trading day)
 - `metrics`: `backtest_horizon`, `mae_model`, `mae_naive`, `mape_model_pct`, `beats_naive`
-- `commentary` (only with `commentary=true`): `text`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `eval`, `generated_at`, `cached`
+- `commentary` (only with `commentary=true`): `text`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `eval`, `stop_reason`, `truncated`, `generated_at`, `cached`
 
 The `eval` block is the numbers-match guard: every number in the text is traced back to the forecast, its metrics or values derived from them (`numbers_checked`, `numbers_matched`, `unmatched`, `passed`). It is an observability signal, not a gate — a failed check does not block the response.
 
+`truncated` is `true` when the model stopped at its token budget (`stop_reason: "max_tokens"`); such a response is returned as is but never cached, so the next request generates a fresh one. The budget (`MAX_TOKENS` in `app/commentary.py`, currently 2048) covers the model's thinking as well as the text — thinking tokens count toward it even though they are not returned. `truncated` and `eval` are independent signals.
+
 ### Example
 
-`GET /forecast/SAP.DE?horizon=5&commentary=true&language=en` — a live response from the deployed service (2026-10-19), shortened:
+`GET /forecast/SAP.DE?horizon=5&commentary=true&language=en` — a live response from the deployed service (2026-10-19, recorded before `stop_reason` and `truncated` were added), shortened:
 
 ```json
 {
@@ -118,7 +120,7 @@ A daily Holt-Winters forecast often does not beat the naive baseline over a few 
 - Plain forecasts: `30/hour` per client; forecasts with commentary: `5/hour` per client (each one is a paid LLM call). Both are configurable, see below.
 - The client is the caller's address. Behind the Azure Container Apps ingress it is taken from `X-Forwarded-For`, trusting only hops from the ingress network (`TRUSTED_PROXY_CIDRS`); entries a caller adds itself are never used.
 - Commentary is cached in-process until UTC midnight, keyed by ticker, language, horizon and the numbers the text cites (last close, forecast start and end). A price move during the trading day therefore yields fresh text; unchanged numbers reuse the block.
-- With `cached: true`, `model`, `input_tokens`, `output_tokens`, `cost_usd` and `generated_at` refer to the original generation (no new LLM call); `eval` is recomputed against the response it is part of.
+- With `cached: true`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `stop_reason` and `generated_at` refer to the original generation (no new LLM call); `truncated` is always `false` on a hit because only complete replies are stored; `eval` is recomputed against the response it is part of.
 
 ## Configuration
 

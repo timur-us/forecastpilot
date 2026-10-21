@@ -18,27 +18,34 @@ def _fresh_cache(monkeypatch):
 
 
 class _CountingMessages:
-    def __init__(self, text=None):
+    def __init__(self, text=None, stop_reason="end_turn"):
         self.calls = 0
         self.text = text
+        # A single stop_reason for every call, or a list consumed call by call
+        # (the last entry repeats).
+        self.stop_reasons = (
+            stop_reason if isinstance(stop_reason, list) else [stop_reason]
+        )
 
     def create(self, **kwargs):
         self.calls += 1
         text = self.text or f"Commentary #{self.calls}."
+        stop_reason = self.stop_reasons[min(self.calls, len(self.stop_reasons)) - 1]
         return SimpleNamespace(
             content=[SimpleNamespace(type="text", text=text)],
+            stop_reason=stop_reason,
             usage=SimpleNamespace(input_tokens=100, output_tokens=200),
         )
 
 
 class _FakeClient:
-    def __init__(self, text=None):
-        self.messages = _CountingMessages(text)
+    def __init__(self, text=None, stop_reason="end_turn"):
+        self.messages = _CountingMessages(text, stop_reason)
 
 
-def _patched_client(monkeypatch, text=None):
+def _patched_client(monkeypatch, text=None, stop_reason="end_turn"):
     """Install one fake Anthropic client instance for the whole test."""
-    fake = _FakeClient(text)
+    fake = _FakeClient(text, stop_reason)
     monkeypatch.setattr(commentary, "Anthropic", lambda *a, **kw: fake)
     return fake
 
@@ -74,6 +81,7 @@ def test_second_identical_request_is_served_from_cache(monkeypatch):
     assert first["cached"] is False
     assert second["cached"] is True
     assert second["text"] == first["text"]
+    assert second["truncated"] is False
     assert fake.messages.calls == 1
 
 
@@ -152,6 +160,45 @@ def test_hit_re_evaluates_numbers_against_current_metrics(monkeypatch):
     assert second["cached"] is True
     assert second["eval"]["passed"] is False
     assert second["eval"]["unmatched"] == ["1.0000"]
+
+
+def test_truncated_response_is_returned_flagged_but_never_cached(monkeypatch):
+    fake = _patched_client(
+        monkeypatch, text="Last close 100.00. The", stop_reason="max_tokens"
+    )
+
+    first = _call()
+    second = _call()
+
+    assert first["truncated"] is True
+    assert first["stop_reason"] == "max_tokens"
+    assert first["cached"] is False
+    assert second["cached"] is False
+    assert fake.messages.calls == 2
+    assert cache._store == {}
+
+
+def test_after_a_truncated_reply_the_next_complete_one_is_cached(monkeypatch):
+    fake = _patched_client(monkeypatch, stop_reason=["max_tokens", "end_turn"])
+
+    first = _call()
+    second = _call()
+    third = _call()
+
+    assert first["truncated"] is True and first["cached"] is False
+    assert second["truncated"] is False and second["cached"] is False
+    assert third["cached"] is True
+    assert fake.messages.calls == 2
+
+
+def test_refused_reply_is_not_cached(monkeypatch):
+    fake = _patched_client(monkeypatch, text="Partial", stop_reason="refusal")
+
+    with pytest.raises(commentary.CommentaryError, match="refusal"):
+        _call()
+
+    assert cache._store == {}
+    assert fake.messages.calls == 1
 
 
 def test_generated_at_is_set_and_kept_on_hit(monkeypatch):
