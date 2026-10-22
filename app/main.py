@@ -163,10 +163,10 @@ def _history(series) -> list[ClosePoint]:
     ]
 
 
-WEB_UI_URL = "https://timur-us.github.io/forecastpilot/"
+WEB_UI_URL = os.getenv("WEB_UI_URL", "https://timur-us.github.io/forecastpilot/")
 
 
-@app.get("/", include_in_schema=False)
+@app.api_route("/", methods=["GET", "HEAD"], include_in_schema=False)
 def root() -> RedirectResponse:
     """The web UI lives on GitHub Pages; /docs stays the API reference."""
     return RedirectResponse(url=WEB_UI_URL)

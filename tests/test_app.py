@@ -29,6 +29,12 @@ def test_root_redirects_to_the_web_ui():
     assert r.headers["location"] == "https://timur-us.github.io/forecastpilot/"
 
 
+def test_root_redirect_also_answers_head():
+    r = client.head("/", follow_redirects=False)
+    assert r.status_code in (302, 307)
+    assert r.headers["location"] == "https://timur-us.github.io/forecastpilot/"
+
+
 def test_docs_are_still_served():
     assert client.get("/docs").status_code == 200
 

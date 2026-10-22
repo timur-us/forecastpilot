@@ -61,8 +61,6 @@ a:hover { color: #FFFFFF; }
 .fp-field:focus { outline: 2px solid var(--fp-accent); outline-offset: 1px; }
 .fp-field:hover { border-color: var(--fp-muted); }
 .fp-field::placeholder { color: var(--fp-muted); opacity: 1; }
-.fp-hov:hover { background: var(--fp-hover); color: var(--fp-text); }
-.fp-hov:active { background: var(--fp-line); }
 .fp-pri:hover { filter: brightness(1.1); }
 .fp-pri:active { filter: brightness(0.92); }
 .fp-switch-input:focus-visible + .fp-switch-track { outline: 2px solid var(--fp-accent); outline-offset: 2px; }
@@ -82,6 +80,7 @@ a:hover { color: #FFFFFF; }
 .fp-chip svg { flex-shrink: 0; }
 .fp-chip-panel { background: var(--fp-panel); }
 .fp-chip-strong { color: var(--fp-text); }
+.fp-chip-mono.fp-muted { color: var(--fp-muted); }
 .fp-nav { margin-left: auto; margin-right: -8px; display: flex; align-items: center; gap: 4px; font-size: 13px; line-height: 20px; font-weight: 500; }
 .fp-nav a, .fp-footer-links a { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0 8px; border-radius: var(--fp-radius); color: var(--fp-muted); text-decoration: none; }
 .fp-footer-links a { gap: 6px; }
@@ -165,8 +164,8 @@ select.fp-field { appearance: none; -webkit-appearance: none; font-family: var(-
 .fp-chip-danger { gap: 8px; border-color: var(--fp-danger-line); background: var(--fp-danger-soft); color: var(--fp-danger); font-family: var(--fp-font-mono); font-weight: 500; }
 .fp-steps { width: 100%; max-width: 480px; border: 1px solid var(--fp-line); border-radius: var(--fp-radius); background: var(--fp-bg); padding: 8px 0; display: flex; flex-direction: column; text-align: left; }
 .fp-step { display: flex; align-items: center; gap: 12px; min-height: 32px; padding: 0 16px; font-size: 13px; line-height: 20px; color: var(--fp-muted); }
-.fp-step svg { display: block; flex-shrink: 0; }
-.fp-step-ico { display: none; }
+.fp-step svg { flex-shrink: 0; }
+.fp-step .fp-step-ico { display: none; }
 .fp-step[data-state="done"] .fp-step-ico-done, .fp-step[data-state="active"] .fp-step-ico-active, .fp-step[data-state="pending"] .fp-step-ico-pending { display: block; }
 .fp-step[data-state="active"] { color: var(--fp-text); font-weight: 500; }
 .fp-progress { width: 100%; max-width: 480px; display: flex; flex-direction: column; gap: 8px; }
@@ -180,7 +179,8 @@ select.fp-field { appearance: none; -webkit-appearance: none; font-family: var(-
 /* ---------- result ---------- */
 .fp-res-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-end; gap: 16px; }
 .fp-res-head-l { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.fp-ticker { font: var(--fp-ticker); letter-spacing: -0.01em; }
+.fp-ticker { margin: 0; font: var(--fp-ticker); letter-spacing: -0.01em; }
+[data-state]:focus { outline: none; }
 .fp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
 
 .fp-kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--fp-line); border: 1px solid var(--fp-line); border-radius: 6px; overflow: hidden; }
@@ -201,6 +201,7 @@ select.fp-field { appearance: none; -webkit-appearance: none; font-family: var(-
 .fp-bar-mark { position: absolute; top: 1px; width: 2px; height: 14px; margin-left: -1px; background: var(--fp-text); }
 .fp-verdict { flex: 1.4 1 280px; }
 .fp-verdict.ok { background: var(--fp-ok-soft); } .fp-verdict.warn { background: var(--fp-warn-soft); }
+.fp-verdict.none .fp-verdict-label, .fp-verdict.none .fp-verdict-title { color: var(--fp-text-2); }
 .fp-verdict-label { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; line-height: 16px; font-weight: 600; letter-spacing: var(--fp-label-tracking); text-transform: uppercase; }
 .fp-verdict-title { font-size: 16px; line-height: 24px; font-weight: 600; }
 .fp-verdict.ok .fp-verdict-label, .fp-verdict.ok .fp-verdict-title { color: var(--fp-ok); }
@@ -287,3 +288,7 @@ select.fp-field { appearance: none; -webkit-appearance: none; font-family: var(-
   .fp-hood { order: -1; }
   .fp-kpi { flex-basis: 100%; }
 }
+
+/* hover states last so they win over per-button backgrounds */
+.fp-hov:hover { background: var(--fp-hover); color: var(--fp-text); }
+.fp-hov:active { background: var(--fp-line); }

@@ -4,6 +4,18 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Re-run a deployment by hand, e.g. after a failed run (the change
+  # detection below only looks at the latest push).
+  workflow_dispatch:
+    inputs:
+      deploy_api:
+        description: Deploy the API to Azure
+        type: boolean
+        default: false
+      deploy_web:
+        description: Publish web/ to GitHub Pages
+        type: boolean
+        default: false
 
 jobs:
   lint-test:
@@ -43,15 +55,24 @@ jobs:
         env:
           BASE: ${{ github.event.before }}
           HEAD: ${{ github.sha }}
+          EVENT: ${{ github.event_name }}
+          FORCE_API: ${{ inputs.deploy_api }}
+          FORCE_WEB: ${{ inputs.deploy_web }}
         run: |
+          if [ "$EVENT" = "workflow_dispatch" ]; then
+            echo "manual run: api=$FORCE_API web=$FORCE_WEB"
+            echo "api=$FORCE_API" >> "$GITHUB_OUTPUT"; echo "web=$FORCE_WEB" >> "$GITHUB_OUTPUT"; exit 0
+          fi
           if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             echo "no usable base commit; deploying everything"
             echo "api=true" >> "$GITHUB_OUTPUT"; echo "web=true" >> "$GITHUB_OUTPUT"; exit 0
           fi
-          files=$(git diff --name-only "$BASE" "$HEAD")
+          files=$(git diff --no-renames --name-only "$BASE" "$HEAD")
           printf 'changed files:\n%s\n' "$files"
           api=false; web=false
-          echo "$files" | grep -qE '^(app/|requirements[^/]*\.txt$|Dockerfile$|\.github/workflows/ci\.yml$)' && api=true
+          # What goes into the image or the rollout: app code, runtime pins,
+          # the Dockerfile and its ignore list, and this workflow (env values).
+          echo "$files" | grep -qE '^(app/|requirements\.txt$|Dockerfile$|\.dockerignore$|\.github/workflows/ci\.yml$)' && api=true
           echo "$files" | grep -qE '^web/' && web=true
           echo "api=$api" >> "$GITHUB_OUTPUT"; echo "web=$web" >> "$GITHUB_OUTPUT"
           echo "api=$api web=$web"
@@ -105,6 +126,7 @@ jobs:
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.web == 'true'
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pages: write
       id-token: write
     environment:

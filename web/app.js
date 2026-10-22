@@ -13,6 +13,8 @@ const FORECAST_TIMEOUT_MS = 120000;
 /* ?api=http://127.0.0.1:8000 overrides the API for local development only. */
 function apiBase() {
   try {
+    const here = location.hostname;
+    if (here !== '127.0.0.1' && here !== 'localhost') return API_BASE;
     const raw = new URLSearchParams(location.search).get('api');
     if (!raw) return API_BASE;
     const u = new URL(raw);
@@ -45,8 +47,9 @@ let lastResult = null;
 /* ---------- state switching ---------- */
 function show(state) {
   for (const s of STATES) $('state-' + s).hidden = s !== state;
-  if (state === 'idle') $('ticker').focus({ preventScroll: true });
   window.scrollTo({ top: 0, behavior: 'auto' });
+  if (state === 'idle') $('ticker').focus({ preventScroll: true });
+  else $('state-' + state).focus({ preventScroll: true });
 }
 function announce(text) { $('live').textContent = text; }
 
@@ -68,7 +71,6 @@ function showError(title, text) {
   $('error-text').textContent = text;
   $('error').hidden = false;
   show('idle');
-  announce(title + ' ' + text);
 }
 function clearError() { $('error').hidden = true; }
 
@@ -121,7 +123,7 @@ async function start(withCommentary) {
     clearInterval(run.timer);
     run = null;
     if (res.status === 429) { renderRateLimited(headers, withCommentary); return; }
-    if (!res.ok) { renderHttpError(res.status, body); return; }
+    if (!res.ok) { renderHttpError(res.status, body, withCommentary); return; }
     lastResult = { body, headers: pickHeaders(headers), ticker, horizon, lang, withCommentary, receivedAt: new Date() };
     renderResult(lastResult);
     show('result');
@@ -196,15 +198,17 @@ function renderWaking(ticker) {
 }
 
 /* ---------- errors ---------- */
-function renderHttpError(status, body) {
+function renderHttpError(status, body, withCommentary) {
   const detail = body && typeof body.detail === 'string' ? body.detail : '';
   if (status === 404) return showError('Unknown ticker.', detail || 'No market data was found for that symbol.');
   if (status === 422) {
     const msg = detail || (body && Array.isArray(body.detail) ? body.detail.map((d) => d.msg).join('; ') : '') || 'The request was rejected.';
     return showError('Not enough data.', msg);
   }
-  if (status === 503) return showError('Commentary is not configured on the server.', detail || 'HTTP 503');
-  if (status === 502) return showError('The commentary could not be generated.', `${detail || 'LLM call failed'} — the forecast itself is unaffected; try again or switch commentary off.`);
+  // The API explains commentary failures in `detail`; an ingress 502/503 has none.
+  if (withCommentary && detail && status === 503) return showError('Commentary is not configured on the server.', detail);
+  if (withCommentary && detail && status === 502) return showError('The commentary could not be generated.', `${detail} — the forecast itself is unaffected; try again or switch commentary off.`);
+  if (status >= 500) return showError(`The API answered with HTTP ${status}.`, detail || 'Try again in a minute.');
   return showError(`The API answered with HTTP ${status}.`, detail || '');
 }
 
@@ -246,6 +250,7 @@ function resetMinutes(h) {
 /* ---------- result ---------- */
 const fmt2 = (v) => Number(v).toFixed(2);
 const fmtPct = (v) => `${v >= 0 ? '+' : '−'}${Math.abs(v).toFixed(2)} %`;
+const finite = (v) => (v === null || v === undefined || v === '' ? NaN : Number(v));
 
 function renderResult(r) {
   const b = r.body;
@@ -253,12 +258,13 @@ function renderResult(r) {
   const hist = Array.isArray(b.history) ? b.history : [];
   const fc = b.forecast;
   const m = b.metrics || {};
-  const last = Number(b.last_close);
-  const end = Number(fc[fc.length - 1]);
+  const last = finite(b.last_close);
+  const end = finite(fc[fc.length - 1]);
 
   $('r-ticker').textContent = b.ticker;
   $('r-horizon').textContent = String(b.horizon_days);
-  $('r-lang').textContent = c ? (r.lang === 'de' ? 'in German' : 'in English') : 'off';
+  $('r-lang').textContent = c ? (r.lang === 'de' ? 'German' : 'English') : 'off';
+  $('r-lang-in').hidden = !c;
   const gen = c && c.generated_at ? new Date(c.generated_at) : r.receivedAt;
   $('r-generated').textContent = fmtUtc(gen);
 
@@ -267,32 +273,41 @@ function renderResult(r) {
   $('k-fc').textContent = fmt2(end);
   $('k-pct').textContent = fmtPct((end / last - 1) * 100);
 
-  const maeModel = Number(m.mae_model), maeNaive = Number(m.mae_naive);
-  const beats = m.beats_naive === true;
-  $('k-mae').textContent = Number.isFinite(maeModel) ? fmt2(maeModel) : '–';
-  $('k-naive').textContent = Number.isFinite(maeNaive) ? fmt2(maeNaive) : '–';
-  const scale = Math.max(maeModel, maeNaive) * 1.25 || 1;
-  const modelPct = (maeModel / scale) * 100, naivePct = (maeNaive / scale) * 100;
-  const fill = $('bar-fill'), excess = $('bar-excess');
-  fill.style.width = `${(beats ? modelPct : naivePct).toFixed(2)}%`;
-  fill.classList.toggle('miss', !beats);
-  excess.hidden = beats;
-  if (!beats) { excess.style.left = `${naivePct.toFixed(2)}%`; excess.style.width = `${Math.max(0, modelPct - naivePct).toFixed(2)}%`; }
-  $('bar-mark').style.left = `${naivePct.toFixed(2)}%`;
+  // Short series (fewer than twice the horizon) come back without a backtest.
+  const maeModel = finite(m.mae_model), maeNaive = finite(m.mae_naive), mape = finite(m.mape_model_pct);
+  const hasBacktest = Number.isFinite(maeModel) && Number.isFinite(maeNaive);
+  const beats = hasBacktest && m.beats_naive === true;
+  $('k-mae').textContent = hasBacktest ? fmt2(maeModel) : '–';
+  $('k-naive').textContent = hasBacktest ? fmt2(maeNaive) : '–';
+  $('bar').hidden = !hasBacktest;
+  if (hasBacktest) {
+    const scale = Math.max(maeModel, maeNaive) * 1.25 || 1;
+    const modelPct = (maeModel / scale) * 100, naivePct = (maeNaive / scale) * 100;
+    const fill = $('bar-fill'), excess = $('bar-excess');
+    fill.style.width = `${(beats ? modelPct : naivePct).toFixed(2)}%`;
+    fill.classList.toggle('miss', !beats);
+    excess.hidden = beats;
+    if (!beats) { excess.style.left = `${naivePct.toFixed(2)}%`; excess.style.width = `${Math.max(0, modelPct - naivePct).toFixed(2)}%`; }
+    $('bar-mark').style.left = `${naivePct.toFixed(2)}%`;
+  }
   const v = $('verdict');
-  v.classList.toggle('ok', beats); v.classList.toggle('warn', !beats);
-  $('verdict-title').textContent = beats ? 'Beats the naive baseline' : 'Does not beat the naive baseline';
-  const margin = Number.isFinite(maeModel) && Number.isFinite(maeNaive) ? Math.abs(maeNaive - maeModel) / maeNaive : 0;
-  $('verdict-sub').textContent = beats
-    ? (margin < 0.1 ? 'Narrow margin: treat with care.' : 'Lower backtest error than the naive baseline.')
-    : 'Treat this forecast as a weak signal.';
+  v.classList.toggle('ok', beats); v.classList.toggle('warn', hasBacktest && !beats); v.classList.toggle('none', !hasBacktest);
+  $('verdict-title').textContent = !hasBacktest ? 'No backtest for this horizon' : beats ? 'Beats the naive baseline' : 'Does not beat the naive baseline';
+  const margin = hasBacktest ? Math.abs(maeNaive - maeModel) / maeNaive : 0;
+  $('verdict-sub').textContent = !hasBacktest
+    ? 'Too little history to hold this many days out; the forecast is shown without a verdict.'
+    : beats
+      ? (margin < 0.1 ? 'Narrow margin: treat with care.' : 'Lower backtest error than the naive baseline.')
+      : 'Treat this forecast as a weak signal.';
 
   renderChart(hist, fc, last, b.horizon_days);
   $('c-h').textContent = String(b.horizon_days);
   $('x-left').textContent = `${hist.length || HISTORY_POINTS} trading days ago`;
   $('x-right').textContent = `+${b.horizon_days} d`;
+  $('note-backtest').hidden = !hasBacktest;
+  $('note-nobacktest').hidden = hasBacktest;
   $('n-h').textContent = String(m.backtest_horizon ?? b.horizon_days);
-  $('n-mape').textContent = Number.isFinite(Number(m.mape_model_pct)) ? `${Number(m.mape_model_pct).toFixed(2)} %` : '–';
+  $('n-mape').textContent = Number.isFinite(mape) ? `${mape.toFixed(2)} %` : '–';
 
   renderCommentary(c, r.lang, b.ticker);
   renderHood(c, r.headers, r.withCommentary);
@@ -311,8 +326,8 @@ function renderChart(hist, fc, last, horizon) {
   const all = series.concat(fc.map(Number));
   const n = series.length + fc.length;
   const lo0 = Math.min(...all), hi0 = Math.max(...all);
-  const pad = Math.max((hi0 - lo0) * 0.08, hi0 * 0.002, 0.01);
-  const ticks = niceTicks(lo0 - pad, hi0 + pad, 8);
+  const pad = Math.max((hi0 - lo0) * 0.08, Math.abs(hi0) * 0.002, 1e-6);
+  const ticks = niceTicks(lo0 >= 0 ? Math.max(0, lo0 - pad) : lo0 - pad, hi0 + pad, 8);
   const lo = ticks.lo, hi = ticks.hi;
   const yTop = 16, yBot = 240;
   const X = (i) => (i * 1000) / (n - 1);
@@ -360,41 +375,61 @@ function niceTicks(lo, hi, count) {
   const rough = span / (count - 1);
   const mag = Math.pow(10, Math.floor(Math.log10(rough)));
   const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= rough) || 10 * mag;
-  const start = Math.floor(lo / step) * step, stop = Math.ceil(hi / step) * step;
   const values = [];
-  for (let v = start; v <= stop + step / 2; v += step) values.push(Number(v.toFixed(6)));
-  const decimals = step >= 1 ? 0 : step >= 0.1 ? 1 : 2;
-  return { lo: start, hi: stop, values, format: (v) => v.toFixed(decimals) };
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) values.push(Number(v.toFixed(6)));
+  const decimals = Math.max(0, -Math.floor(Math.log10(step)));
+  return { lo, hi, values, format: (v) => v.toFixed(decimals) };
 }
 
 /* Commentary is model output: escaped first, then only **bold** and
  * paragraphs are turned into markup; numbers get the mono treatment. */
+const HEADING_RE = /^\*\*([^*]+)\*\*\s*$/;
+const DISCLAIMERS = ['Educational analysis — not investment advice.', 'Bildungsanalyse — keine Anlageberatung.'];
+
 function renderCommentary(c, lang, ticker) {
   const box = $('comm-text');
   box.replaceChildren();
   $('comm').hidden = !c;
+  box.lang = lang === 'de' ? 'de' : 'en';
+  $('disclaimer').lang = box.lang;
   $('model-tag').textContent = c ? `${lang === 'de' ? 'German' : 'English'} · ${c.model || ''}` : '';
   $('callout').hidden = !(c && c.truncated);
   if (!c) return;
-  const DISCLAIMERS = ['Educational analysis — not investment advice.', 'Bildungsanalyse — keine Anlageberatung.'];
   const paras = String(c.text || '').replace(/\r\n/g, '\n').trim().split(/\n{2,}/);
   const closing = paras.length > 1 ? DISCLAIMERS.find((d) => paras[paras.length - 1].trim().replace(/\*/g, '') === d) : null;
   if (closing) paras.pop();
   $('disclaimer').textContent = closing || (lang === 'de' ? DISCLAIMERS[1] : DISCLAIMERS[0]);
-  paras.forEach((para, idx) => {
+  try {
+    renderSections(box, paras, ticker, Boolean(c.truncated));
+  } catch (_) {
+    // Never lose the text over a rendering detail: fall back to plain paragraphs.
+    box.replaceChildren(...paras.map((para) => { const p = document.createElement('p'); p.textContent = para.replace(/\*\*/g, ''); return p; }));
+  }
+}
+
+function renderSections(box, paras, ticker, truncated) {
+  const sections = [];
+  let pendingHeading = null;
+  for (const para of paras) {
     const lines = para.split('\n');
+    const first = lines[0].match(HEADING_RE);
+    if (first && lines.length === 1) { pendingHeading = first[1]; continue; }
+    let heading = pendingHeading, bodyLines = lines;
+    pendingHeading = null;
+    if (!heading && first) { heading = first[1]; bodyLines = lines.slice(1); }
+    sections.push({ heading, body: bodyLines.join(' ') });
+  }
+  if (pendingHeading) sections.push({ heading: pendingHeading, body: '' });
+  sections.forEach((sec, idx) => {
     const section = document.createElement('section');
-    const headingMatch = lines[0].match(/^\*\*(.+?)\*\*\s*$/);
-    let bodyLines = lines;
-    if (headingMatch && lines.length > 1) {
+    if (sec.heading) {
       const h = document.createElement('h4');
-      h.textContent = headingMatch[1];
+      h.textContent = sec.heading;
       section.appendChild(h);
-      bodyLines = lines.slice(1);
     }
     const p = document.createElement('p');
-    appendInline(p, bodyLines.join(' '), ticker);
-    if (c.truncated && idx === paras.length - 1) {
+    appendInline(p, sec.body, ticker);
+    if (truncated && idx === sections.length - 1) {
       const cut = document.createElement('span');
       cut.className = 'fp-cut'; cut.setAttribute('aria-hidden', 'true');
       p.appendChild(cut);
@@ -419,10 +454,13 @@ function appendInline(parent, text, ticker) {
   }
 }
 function appendMono(parent, text, ticker) {
-  const esc = ticker.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const re = new RegExp(`(${esc}|beats_naive|\\bTrue\\b|\\bFalse\\b|(?<![A-Za-z])[+-]?\\d[\\d.,]*\\d%?|(?<![A-Za-z])\\d%?)`, 'g');
+  const esc = String(ticker || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const alts = esc ? [`(?<![A-Za-z0-9])${esc}(?![A-Za-z0-9])`] : [];
+  alts.push('beats_naive', '\\bTrue\\b', '\\bFalse\\b', '(?<![A-Za-z])[+-]?\\d[\\d.,]*\\d%?', '(?<![A-Za-z])\\d%?');
+  const re = new RegExp(`(${alts.join('|')})`, 'g');
   let i = 0, m;
   while ((m = re.exec(text)) !== null) {
+    if (m[0].length === 0) { re.lastIndex++; continue; }
     if (m.index > i) parent.appendChild(document.createTextNode(text.slice(i, m.index)));
     const span = document.createElement('span');
     span.className = 'fp-num';
