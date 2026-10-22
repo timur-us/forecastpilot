@@ -28,12 +28,15 @@ const API = apiBase();
 
 const $ = (id) => document.getElementById(id);
 const STATES = ['idle', 'waking', '429', 'result'];
-const STEP_LABELS = [
-  'Starting the container',
-  'Loading two years of prices',
-  'Fitting the model and backtesting',
-  'Writing and checking the commentary',
-];
+/* Two phases the page can actually observe: the health probe, then the
+ * one request that does everything else. */
+const PHASE_1 = 'Starting the container';
+function phase2Label(ticker, withCommentary) {
+  const work = withCommentary
+    ? 'loading prices, fitting the model, writing and checking the commentary'
+    : 'loading prices and fitting the model';
+  return `Working on ${ticker} · one request: ${work}`;
+}
 
 const form = {
   ticker: $('ticker'),
@@ -97,13 +100,12 @@ async function start(withCommentary) {
   run = {
     controller,
     startedAt: performance.now(),
-    step: 0,
     requestSentAt: null,
     withCommentary,
-    stepTotal: withCommentary ? 4 : 3,
     timer: null,
   };
   $('waking-tag').textContent = `${ticker} · ${horizon} trading days`;
+  $('phase2-label').textContent = phase2Label(ticker, withCommentary);
   renderWaking(ticker);
   run.timer = setInterval(() => renderWaking(ticker), 250);
   show('waking');
@@ -112,7 +114,6 @@ async function start(withCommentary) {
   try {
     await waitForHealth(controller.signal);
     if (controller.signal.aborted) return;
-    run.step = 1;
     run.requestSentAt = performance.now();
     const params = new URLSearchParams({ horizon: String(horizon), commentary: String(withCommentary), language: lang });
     const res = await fetchWithTimeout(`${API}/forecast/${encodeURIComponent(ticker)}?${params}`, controller.signal, FORECAST_TIMEOUT_MS);
@@ -165,36 +166,28 @@ async function waitForHealth(signal) {
   }
 }
 
-/* The API is one call, so steps 2–4 cannot be observed separately; they
- * advance on a timer while the request is in flight (step 1 is real: the
- * health probe). */
+/* Phase 1 is the health probe; phase 2 is the single forecast request.
+ * Nothing in between can be observed, so nothing is simulated. */
 function renderWaking(ticker) {
   if (!run) return;
   const elapsed = (performance.now() - run.startedAt) / 1000;
-  let step = 0;
-  let within = Math.min(1, elapsed / 20);
-  if (run.requestSentAt !== null) {
-    const t = (performance.now() - run.requestSentAt) / 1000;
-    step = t < 1.5 ? 1 : t < 4 ? 2 : 3;
-    within = step === 1 ? t / 1.5 : step === 2 ? (t - 1.5) / 2.5 : Math.min(1, (t - 4) / 6);
-  }
-  step = Math.min(step, run.stepTotal - 1);
-  const steps = document.querySelectorAll('#steps .fp-step');
-  steps.forEach((el, i) => {
-    el.hidden = i >= run.stepTotal;
-    const state = i < step ? 'done' : i === step ? 'active' : 'pending';
+  const phase = run.requestSentAt === null ? 0 : 1;
+  document.querySelectorAll('#steps .fp-step').forEach((el, i) => {
+    const state = i < phase ? 'done' : i === phase ? 'active' : 'pending';
     el.dataset.state = state;
     el.querySelector('.fp-step-sr').textContent = state === 'done' ? 'done' : state === 'active' ? 'in progress' : 'pending';
   });
-  const fraction = (step + Math.max(0, Math.min(1, within))) / run.stepTotal;
-  const filled = Math.min(7, Math.round(fraction * 7));
-  $('meter').querySelectorAll('span').forEach((s, i) => s.classList.toggle('on', i < filled));
-  $('progress').value = filled;
-  $('waking-title').textContent = step === 0 ? 'Waking the service…' : `Working on ${ticker}…`;
-  $('waking-hint').textContent = step === 0
+  $('meter').querySelectorAll('span').forEach((s, i) => {
+    s.classList.toggle('on', i < phase);
+    s.classList.toggle('active', i === phase);
+  });
+  $('progress').value = phase;
+  $('waking-title').textContent = phase === 0 ? 'Waking the service…' : `Working on ${ticker}…`;
+  $('waking-hint').textContent = phase === 0
     ? 'The container was asleep to save cost. Starting it takes about 20 seconds; this page shows what happens while you wait.'
-    : 'Prices are loaded, the model is fitted, and the commentary is checked against the numbers before you see it.';
-  $('progress-caption').textContent = `Step ${step + 1} of ${run.stepTotal} · ${STEP_LABELS[step]} · ${Math.floor(elapsed)} s`;
+    : 'One request loads the prices, fits the model and, if asked, writes and checks the commentary. The page has nothing to show until it returns.';
+  const label = phase === 0 ? PHASE_1 : `Working on ${ticker}`;
+  $('progress-caption').textContent = `Phase ${phase + 1} of 2 · ${label} · ${Math.floor(elapsed)} s`;
 }
 
 /* ---------- errors ---------- */

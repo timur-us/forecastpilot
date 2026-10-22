@@ -163,7 +163,8 @@ select.fp-field { appearance: none; -webkit-appearance: none; font-family: var(-
 .fp-chip-mono { font-family: var(--fp-font-mono); color: var(--fp-text); }
 .fp-chip-danger { gap: 8px; border-color: var(--fp-danger-line); background: var(--fp-danger-soft); color: var(--fp-danger); font-family: var(--fp-font-mono); font-weight: 500; }
 .fp-steps { width: 100%; max-width: 480px; border: 1px solid var(--fp-line); border-radius: var(--fp-radius); background: var(--fp-bg); padding: 8px 0; display: flex; flex-direction: column; text-align: left; }
-.fp-step { display: flex; align-items: center; gap: 12px; min-height: 32px; padding: 0 16px; font-size: 13px; line-height: 20px; color: var(--fp-muted); }
+.fp-step { display: flex; align-items: center; gap: 12px; min-height: 32px; padding: 6px 16px; font-size: 13px; line-height: 20px; color: var(--fp-muted); }
+.fp-step-label { min-width: 0; }
 .fp-step svg { flex-shrink: 0; }
 .fp-step .fp-step-ico { display: none; }
 .fp-step[data-state="done"] .fp-step-ico-done, .fp-step[data-state="active"] .fp-step-ico-active, .fp-step[data-state="pending"] .fp-step-ico-pending { display: block; }
@@ -172,6 +173,7 @@ select.fp-field { appearance: none; -webkit-appearance: none; font-family: var(-
 .fp-meter { display: flex; gap: var(--fp-meter-gap); }
 .fp-meter > span { display: block; flex: 1 1 0; height: var(--fp-meter-h); border-radius: var(--fp-meter-radius); border: 1px solid var(--fp-field-border); background: transparent; }
 .fp-meter > span.on { border-color: var(--fp-accent); background: var(--fp-accent); }
+.fp-meter > span.active { border-color: var(--fp-accent); background: var(--fp-accent-soft); }
 .fp-progress-caption { margin: 0; font-family: var(--fp-font-mono); font-size: 12px; line-height: 16px; color: var(--fp-muted); }
 .fp-quota-big { display: flex; gap: 4px; }
 .fp-quota-big > span { display: block; width: 24px; height: var(--fp-meter-h); border-radius: var(--fp-meter-radius); border: 1px solid var(--fp-danger); }

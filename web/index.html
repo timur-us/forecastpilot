@@ -129,35 +129,23 @@
   <h2 id="waking-title">Waking the service…</h2>
   <p id="waking-hint">The container was asleep to save cost. Starting it takes about 20 seconds; this page shows what happens while you wait.</p>
   <div id="steps" class="fp-steps">
-    <div class="fp-step" data-state="pending" data-step="0">
+    <div class="fp-step" data-state="active" data-step="0">
       <svg class="fp-step-ico fp-step-ico-done" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#1F2A37" stroke="#56677A" stroke-width="1"></circle><path d="M5 8.25L7 10.25L11 6" fill="none" stroke="#A48BFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg>
       <svg class="fp-step-ico fp-step-ico-active" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#A48BFF" stroke-width="1.5"></circle><circle cx="8" cy="8" r="2.75" fill="#A48BFF"></circle></svg>
       <svg class="fp-step-ico fp-step-ico-pending" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#56677A" stroke-width="1.5" stroke-dasharray="2.5 2.4"></circle></svg>
-      <span>Starting the container</span><span class="fp-sr fp-step-sr"></span>
+      <span class="fp-step-label">Starting the container</span><span class="fp-sr fp-step-sr"></span>
     </div>
     <div class="fp-step" data-state="pending" data-step="1">
       <svg class="fp-step-ico fp-step-ico-done" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#1F2A37" stroke="#56677A" stroke-width="1"></circle><path d="M5 8.25L7 10.25L11 6" fill="none" stroke="#A48BFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg>
       <svg class="fp-step-ico fp-step-ico-active" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#A48BFF" stroke-width="1.5"></circle><circle cx="8" cy="8" r="2.75" fill="#A48BFF"></circle></svg>
       <svg class="fp-step-ico fp-step-ico-pending" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#56677A" stroke-width="1.5" stroke-dasharray="2.5 2.4"></circle></svg>
-      <span>Loading two years of prices</span><span class="fp-sr fp-step-sr"></span>
-    </div>
-    <div class="fp-step" data-state="pending" data-step="2">
-      <svg class="fp-step-ico fp-step-ico-done" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#1F2A37" stroke="#56677A" stroke-width="1"></circle><path d="M5 8.25L7 10.25L11 6" fill="none" stroke="#A48BFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-      <svg class="fp-step-ico fp-step-ico-active" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#A48BFF" stroke-width="1.5"></circle><circle cx="8" cy="8" r="2.75" fill="#A48BFF"></circle></svg>
-      <svg class="fp-step-ico fp-step-ico-pending" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#56677A" stroke-width="1.5" stroke-dasharray="2.5 2.4"></circle></svg>
-      <span>Fitting the model and backtesting</span><span class="fp-sr fp-step-sr"></span>
-    </div>
-    <div class="fp-step" data-state="pending" data-step="3">
-      <svg class="fp-step-ico fp-step-ico-done" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#1F2A37" stroke="#56677A" stroke-width="1"></circle><path d="M5 8.25L7 10.25L11 6" fill="none" stroke="#A48BFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-      <svg class="fp-step-ico fp-step-ico-active" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#A48BFF" stroke-width="1.5"></circle><circle cx="8" cy="8" r="2.75" fill="#A48BFF"></circle></svg>
-      <svg class="fp-step-ico fp-step-ico-pending" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#56677A" stroke-width="1.5" stroke-dasharray="2.5 2.4"></circle></svg>
-      <span>Writing and checking the commentary</span><span class="fp-sr fp-step-sr"></span>
+      <span class="fp-step-label" id="phase2-label">Working on the ticker · one request: loading prices, fitting the model, writing and checking the commentary</span><span class="fp-sr fp-step-sr"></span>
     </div>
   </div>
   <div class="fp-progress">
-    <progress id="progress" class="fp-sr" value="0" max="7" aria-label="Progress"></progress>
-    <div id="meter" class="fp-meter" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
-    <p id="progress-caption" class="fp-progress-caption">Step 1 of 4 · Starting the container · 0 s</p>
+    <progress id="progress" class="fp-sr" value="0" max="2" aria-label="Progress"></progress>
+    <div id="meter" class="fp-meter" aria-hidden="true"><span></span><span></span></div>
+    <p id="progress-caption" class="fp-progress-caption">Phase 1 of 2 · Starting the container · 0 s</p>
   </div>
   <button type="button" id="cancel" class="fp-btn fp-btn-sec fp-ring fp-hov"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5L11.5 11.5"></path><path d="M11.5 4.5L4.5 11.5"></path></svg>Cancel</button>
 </section>
