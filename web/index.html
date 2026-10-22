@@ -1,0 +1,312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' https://forecastpilot.mangotree-f644cfcc.germanywestcentral.azurecontainerapps.io http://127.0.0.1:* http://localhost:*; img-src 'self'; style-src 'self'; script-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; object-src 'none'">
+<title>ForecastPilot – forecast with commentary</title>
+<meta name="description" content="A statistical forecast for any Yahoo Finance ticker, plus a short Claude commentary that is checked against the numbers it cites.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="fp-root">
+
+<header class="fp-header">
+  <div class="fp-header-in">
+    <div class="fp-brand">
+      <svg width="20" height="20" viewBox="0 0 20 20" aria-hidden="true"><rect x="0" y="0" width="20" height="20" rx="4" fill="#A48BFF"></rect><path d="M4.5 13.5L8 10L10.5 12" fill="none" stroke="#0B0F14" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path><path d="M10.5 12L15.5 6.5" fill="none" stroke="#0B0F14" stroke-width="1.75" stroke-linecap="round" stroke-dasharray="1.6 2.4"></path></svg>
+      <span class="fp-brand-name">ForecastPilot</span>
+    </div>
+    <span class="fp-divider" aria-hidden="true"></span>
+    <div class="fp-tagwrap">
+      <span class="fp-chip"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"></circle><path d="M8 7.25V11"></path><path d="M8 5V5.01"></path></svg>Educational demo · not investment advice</span>
+    </div>
+    <nav class="fp-nav" aria-label="Links">
+      <a class="fp-ring fp-hov" href="https://forecastpilot.mangotree-f644cfcc.germanywestcentral.azurecontainerapps.io/docs"><svg class="fp-nav-ico" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 4.5L2 8L5.5 11.5"></path><path d="M10.5 4.5L14 8L10.5 11.5"></path></svg>API &amp; Swagger<svg class="fp-nav-ico" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5H12.5V10"></path><path d="M12.5 3.5L4.5 11.5"></path></svg></a>
+      <a class="fp-ring fp-hov" href="https://github.com/timur-us/forecastpilot"><svg class="fp-nav-ico" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="4.5" cy="3.5" r="1.5"></circle><circle cx="4.5" cy="12.5" r="1.5"></circle><circle cx="11.5" cy="5" r="1.5"></circle><path d="M4.5 5V11"></path><path d="M11.5 6.5C11.5 9 9 9.75 4.5 11"></path></svg>GitHub<svg class="fp-nav-ico" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5H12.5V10"></path><path d="M12.5 3.5L4.5 11.5"></path></svg></a>
+    </nav>
+  </div>
+</header>
+
+<main class="fp-main">
+<p class="fp-intro">A statistical forecast for any Yahoo Finance ticker, plus a short Claude commentary that is checked against the numbers it cites.</p>
+<div id="live" class="fp-sr" aria-live="polite"></div>
+
+<!-- ============ STATE: idle ============ -->
+<div id="state-idle" class="fp-stack" data-state>
+<section class="fp-card" aria-labelledby="form-title">
+  <div class="fp-card-h">
+    <div class="fp-card-h-l">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M2.5 4.5H9.5"></path><path d="M12.5 4.5H13.5"></path><path d="M2.5 11.5H4.5"></path><path d="M7.5 11.5H13.5"></path><circle cx="11" cy="4.5" r="1.5"></circle><circle cx="6" cy="11.5" r="1.5"></circle></svg>
+      <h2 id="form-title" class="fp-card-title">Forecast a ticker</h2>
+    </div>
+  </div>
+  <form id="form" class="fp-card-b" novalidate>
+    <p class="fp-help">Two years of daily closes, a Holt-Winters forecast, and a backtest that says whether the model beats the naive baseline.</p>
+    <div id="error" class="fp-error" role="alert" hidden>
+      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#F25F5C" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 2.25L14.5 13.5H1.5Z"></path><path d="M8 6.5V9.25"></path><path d="M8 11.5V11.51"></path></svg>
+      <span><strong id="error-title">Request failed.</strong> <span id="error-text"></span></span>
+    </div>
+    <div class="fp-fields">
+      <div class="fp-col fp-col-ticker">
+        <label for="ticker" class="fp-label">Ticker (Yahoo Finance)</label>
+        <input id="ticker" class="fp-field" type="text" value="NVDA" placeholder="NVDA" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="16" required>
+      </div>
+      <div class="fp-col fp-col-horizon">
+        <label for="horizon" class="fp-label">Horizon</label>
+        <div class="fp-select-wrap">
+          <select id="horizon" class="fp-field">
+            <option value="5">5 trading days</option>
+            <option value="10">10 trading days</option>
+            <option value="30" selected>30 trading days</option>
+            <option value="60">60 trading days</option>
+            <option value="90">90 trading days</option>
+          </select>
+          <svg aria-hidden="true" width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="#8B9AAB" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6L8 10L12 6"></path></svg>
+        </div>
+      </div>
+      <div class="fp-col fp-col-lang">
+        <span class="fp-label" id="lang-label">Commentary language</span>
+        <div class="fp-seg" role="group" aria-labelledby="lang-label">
+          <button type="button" class="fp-ring fp-hov" data-lang="en" aria-pressed="true">English</button>
+          <button type="button" class="fp-ring fp-hov" data-lang="de" aria-pressed="false">Deutsch</button>
+        </div>
+      </div>
+      <div class="fp-col fp-col-ai">
+        <span class="fp-label">AI commentary</span>
+        <label for="commentary" class="fp-switch fp-hov">
+          <input id="commentary" class="fp-switch-input" type="checkbox" checked>
+          <span class="fp-switch-track" aria-hidden="true"><span class="fp-switch-thumb"></span></span>
+          <span class="fp-switch-text">Add Claude commentary <span class="fp-muted">(5 per hour)</span></span>
+        </label>
+      </div>
+    </div>
+  </form>
+  <div class="fp-card-f">
+    <p>The service sleeps when idle. The first request after a quiet period takes about 20 seconds while a container starts; every request after that answers in well under a second.</p>
+    <button type="submit" form="form" class="fp-btn fp-btn-pri fp-ring fp-pri fp-cta">Get forecast<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8H13"></path><path d="M9 4L13 8L9 12"></path></svg></button>
+  </div>
+</section>
+
+<section class="fp-flow" aria-label="How it works">
+  <div class="fp-flow-node">
+    <div class="fp-flow-head">
+      <span class="fp-flow-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="8" cy="4" rx="5" ry="2"></ellipse><path d="M3 4V12C3 13.1 5.24 14 8 14C10.76 14 13 13.1 13 12V4"></path><path d="M3 8C3 9.1 5.24 10 8 10C10.76 10 13 9.1 13 8"></path></svg></span>
+      <span class="fp-flow-no">01 · DATA</span>
+    </div>
+    <strong>Two years of daily closes</strong>
+    <span class="fp-flow-desc">Pulled live from Yahoo Finance for the ticker you enter.</span>
+    <span class="fp-flow-arrow" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4L10 8L6 12"></path></svg></span>
+  </div>
+  <div class="fp-flow-node">
+    <div class="fp-flow-head">
+      <span class="fp-flow-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 13.5H14"></path><path d="M3 10.5L6 7.5L8.5 9.5"></path><path d="M8.5 9.5L13 4.5" stroke-dasharray="1.6 2"></path></svg></span>
+      <span class="fp-flow-no">02 · FORECAST + BACKTEST</span>
+    </div>
+    <strong>A model that admits when it loses</strong>
+    <span class="fp-flow-desc">Holt-Winters, backtested against "just repeat the last close". You see both errors.</span>
+    <span class="fp-flow-arrow" aria-hidden="true"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4L10 8L6 12"></path></svg></span>
+  </div>
+  <div class="fp-flow-node">
+    <div class="fp-flow-head">
+      <span class="fp-flow-ico" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 1.75L13.25 3.75V7.75C13.25 10.75 11 12.9 8 14.25C5 12.9 2.75 10.75 2.75 7.75V3.75Z"></path><path d="M5.75 8L7.25 9.5L10.25 6.5"></path></svg></span>
+      <span class="fp-flow-no">03 · COMMENTARY + CHECK</span>
+    </div>
+    <strong>Claude writes, the code verifies</strong>
+    <span class="fp-flow-desc">Every number in the commentary is traced back to the forecast. Tokens and cost are shown per request.</span>
+  </div>
+</section>
+</div>
+
+<!-- ============ STATE: waking ============ -->
+<section id="state-waking" class="fp-card fp-state" data-state hidden aria-labelledby="waking-title">
+  <div class="fp-spinner" aria-hidden="true">
+    <svg class="fp-spin" width="48" height="48" viewBox="0 0 48 48"><circle cx="24" cy="24" r="21" fill="none" stroke="#1F2A37" stroke-width="2"></circle><circle cx="24" cy="24" r="21" fill="none" stroke="#A48BFF" stroke-width="2" stroke-linecap="round" stroke-dasharray="33 99"></circle></svg>
+    <svg width="18" height="18" viewBox="0 0 16 16" fill="none" stroke="#E6EDF3" stroke-width="1.5" stroke-linecap="round"><path d="M8 2V7.5"></path><path d="M4.75 4.25A5 5 0 1 0 11.25 4.25"></path></svg>
+  </div>
+  <span id="waking-tag" class="fp-chip fp-chip-mono"></span>
+  <h2 id="waking-title">Waking the service…</h2>
+  <p id="waking-hint">The container was asleep to save cost. Starting it takes about 20 seconds; this page shows what happens while you wait.</p>
+  <div id="steps" class="fp-steps">
+    <div class="fp-step" data-state="pending" data-step="0">
+      <svg class="fp-step-ico fp-step-ico-done" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#1F2A37" stroke="#56677A" stroke-width="1"></circle><path d="M5 8.25L7 10.25L11 6" fill="none" stroke="#A48BFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <svg class="fp-step-ico fp-step-ico-active" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#A48BFF" stroke-width="1.5"></circle><circle cx="8" cy="8" r="2.75" fill="#A48BFF"></circle></svg>
+      <svg class="fp-step-ico fp-step-ico-pending" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#56677A" stroke-width="1.5" stroke-dasharray="2.5 2.4"></circle></svg>
+      <span>Starting the container</span><span class="fp-sr fp-step-sr"></span>
+    </div>
+    <div class="fp-step" data-state="pending" data-step="1">
+      <svg class="fp-step-ico fp-step-ico-done" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#1F2A37" stroke="#56677A" stroke-width="1"></circle><path d="M5 8.25L7 10.25L11 6" fill="none" stroke="#A48BFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <svg class="fp-step-ico fp-step-ico-active" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#A48BFF" stroke-width="1.5"></circle><circle cx="8" cy="8" r="2.75" fill="#A48BFF"></circle></svg>
+      <svg class="fp-step-ico fp-step-ico-pending" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#56677A" stroke-width="1.5" stroke-dasharray="2.5 2.4"></circle></svg>
+      <span>Loading two years of prices</span><span class="fp-sr fp-step-sr"></span>
+    </div>
+    <div class="fp-step" data-state="pending" data-step="2">
+      <svg class="fp-step-ico fp-step-ico-done" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#1F2A37" stroke="#56677A" stroke-width="1"></circle><path d="M5 8.25L7 10.25L11 6" fill="none" stroke="#A48BFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <svg class="fp-step-ico fp-step-ico-active" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#A48BFF" stroke-width="1.5"></circle><circle cx="8" cy="8" r="2.75" fill="#A48BFF"></circle></svg>
+      <svg class="fp-step-ico fp-step-ico-pending" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#56677A" stroke-width="1.5" stroke-dasharray="2.5 2.4"></circle></svg>
+      <span>Fitting the model and backtesting</span><span class="fp-sr fp-step-sr"></span>
+    </div>
+    <div class="fp-step" data-state="pending" data-step="3">
+      <svg class="fp-step-ico fp-step-ico-done" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="7" fill="#1F2A37" stroke="#56677A" stroke-width="1"></circle><path d="M5 8.25L7 10.25L11 6" fill="none" stroke="#A48BFF" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+      <svg class="fp-step-ico fp-step-ico-active" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#A48BFF" stroke-width="1.5"></circle><circle cx="8" cy="8" r="2.75" fill="#A48BFF"></circle></svg>
+      <svg class="fp-step-ico fp-step-ico-pending" width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.25" fill="none" stroke="#56677A" stroke-width="1.5" stroke-dasharray="2.5 2.4"></circle></svg>
+      <span>Writing and checking the commentary</span><span class="fp-sr fp-step-sr"></span>
+    </div>
+  </div>
+  <div class="fp-progress">
+    <progress id="progress" class="fp-sr" value="0" max="7" aria-label="Progress"></progress>
+    <div id="meter" class="fp-meter" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span><span></span><span></span></div>
+    <p id="progress-caption" class="fp-progress-caption">Step 1 of 4 · Starting the container · 0 s</p>
+  </div>
+  <button type="button" id="cancel" class="fp-btn fp-btn-sec fp-ring fp-hov"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M4.5 4.5L11.5 11.5"></path><path d="M11.5 4.5L4.5 11.5"></path></svg>Cancel</button>
+</section>
+
+<!-- ============ STATE: rate limited ============ -->
+<section id="state-429" class="fp-card fp-state fp-state-429" data-state hidden aria-labelledby="limit-title">
+  <span class="fp-icon-box" aria-hidden="true"><svg width="24" height="24" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="9" r="5"></circle><path d="M8 6.5V9L9.75 10"></path><path d="M6.5 1.75H9.5"></path><path d="M12.25 4.25L13.25 3.25"></path></svg></span>
+  <span class="fp-chip fp-chip-danger"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"><circle cx="8" cy="8" r="6.25"></circle><path d="M3.6 3.6L12.4 12.4"></path></svg>HTTP 429 · hourly limit reached</span>
+  <h2 id="limit-title">You have used your 5 commentary requests for this hour</h2>
+  <div id="quota-big" class="fp-quota-big" aria-hidden="true"></div>
+  <p id="limit-text">Each commentary is a paid call to Claude, so it is limited to 5 per hour per visitor. Plain forecasts are limited to 30 per hour. Your limit resets in a moment.</p>
+  <div class="fp-btn-row">
+    <button type="button" id="without-commentary" class="fp-btn fp-btn-pri fp-ring fp-pri">Get the forecast without commentary<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 8H13"></path><path d="M9 4L13 8L9 12"></path></svg></button>
+    <button type="button" id="back" class="fp-btn fp-btn-sec fp-ring fp-hov"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M13 8H3"></path><path d="M7 4L3 8L7 12"></path></svg>Back</button>
+  </div>
+</section>
+
+<!-- ============ STATE: result ============ -->
+<div id="state-result" class="fp-stack" data-state hidden>
+<section class="fp-res-head">
+  <div class="fp-res-head-l">
+    <span id="r-ticker" class="fp-ticker"></span>
+    <div class="fp-chips">
+      <span class="fp-chip fp-chip-panel"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="3.5" width="11" height="10" rx="1.5"></rect><path d="M2.5 6.5H13.5"></path><path d="M5.5 2V4.5"></path><path d="M10.5 2V4.5"></path></svg><span><span id="r-horizon" class="fp-mono fp-chip-strong"></span> trading days</span></span>
+      <span id="r-lang-chip" class="fp-chip fp-chip-panel"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"></circle><path d="M2 8H14"></path><path d="M8 2C9.75 3.75 10.5 5.75 10.5 8C10.5 10.25 9.75 12.25 8 14C6.25 12.25 5.5 10.25 5.5 8C5.5 5.75 6.25 3.75 8 2Z"></path></svg><span>commentary <span id="r-lang" class="fp-chip-strong"></span></span></span>
+      <span class="fp-chip fp-chip-panel"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="8" cy="8" r="6"></circle><path d="M8 4.75V8L10.25 9.5"></path></svg><span>generated <span id="r-generated" class="fp-mono fp-chip-strong"></span></span></span>
+    </div>
+  </div>
+  <button type="button" id="new-forecast" class="fp-btn fp-btn-sec fp-on-panel fp-ring fp-hov"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><path d="M8 3.5V12.5"></path><path d="M3.5 8H12.5"></path></svg>New forecast</button>
+</section>
+
+<section class="fp-kpis" aria-label="Key figures">
+  <div class="fp-kpi">
+    <span class="fp-kpi-label"><span class="fp-swatch" aria-hidden="true"></span>Last close</span>
+    <span id="k-last" class="fp-kpi-value"></span>
+  </div>
+  <div class="fp-kpi">
+    <span class="fp-kpi-label"><span class="fp-swatch fp-swatch-fc" aria-hidden="true"></span><span>Forecast after <span id="k-h"></span> days</span></span>
+    <div class="fp-kpi-row"><span id="k-fc" class="fp-kpi-value"></span><span id="k-pct" class="fp-pct"></span></div>
+  </div>
+  <div class="fp-kpi">
+    <span class="fp-kpi-label">Backtest error (MAE)</span>
+    <div class="fp-kpi-row base"><span id="k-mae" class="fp-kpi-value"></span><span class="fp-vs">vs naive <span id="k-naive" class="fp-mono"></span></span></div>
+    <div class="fp-bar" aria-hidden="true">
+      <span class="fp-bar-track"></span>
+      <span id="bar-fill" class="fp-bar-fill"></span>
+      <span id="bar-excess" class="fp-bar-excess" hidden></span>
+      <span id="bar-mark" class="fp-bar-mark"></span>
+    </div>
+  </div>
+  <div id="verdict" class="fp-kpi fp-verdict ok">
+    <span class="fp-verdict-label"><svg class="ico-ok" aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="6.25"></circle><path d="M5.25 8.25L7.25 10.25L10.75 6.25"></path></svg><svg class="ico-warn" aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.25L14.5 13.5H1.5Z"></path><path d="M8 6.5V9.25"></path><path d="M8 11.5V11.51"></path></svg>Verdict</span>
+    <span id="verdict-title" class="fp-verdict-title"></span>
+    <span id="verdict-sub" class="fp-verdict-sub"></span>
+  </div>
+</section>
+
+<section class="fp-card" aria-labelledby="chart-title">
+  <div class="fp-card-h">
+    <div class="fp-card-h-l">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 13.5H14"></path><path d="M3 10.5L6 7.5L8.5 9.5"></path><path d="M8.5 9.5L13 4.5" stroke-dasharray="1.6 2"></path></svg>
+      <h3 id="chart-title" class="fp-card-title">Last 60 closes and the <span id="c-h"></span>-day forecast</h3>
+    </div>
+    <div class="fp-legend"><span><i aria-hidden="true"></i>History</span><span><i class="fc" aria-hidden="true"></i>Forecast</span></div>
+  </div>
+  <div class="fp-chart-wrap">
+    <div class="fp-chart-row">
+      <div id="yaxis" class="fp-yaxis" aria-hidden="true"></div>
+      <div class="fp-chart">
+        <svg id="chart" viewBox="0 0 1000 240" preserveAspectRatio="none" role="img" aria-label="Line chart of the last closing prices followed by the forecast">
+          <g id="grid"></g>
+          <line class="fp-grid" x1="0" x2="1000" y1="239.5" y2="239.5"></line>
+          <line id="today-line" class="fp-today-line" y1="0" y2="240"></line>
+          <path id="hist-path" class="fp-hist" d=""></path>
+          <path id="fc-path" class="fp-fc" d=""></path>
+        </svg>
+        <span id="today-label" class="fp-today-label" aria-hidden="true">today</span>
+        <span id="last-tag" class="fp-price-tag" aria-hidden="true"></span>
+        <span id="today-dot" class="fp-dot" aria-hidden="true"></span>
+        <span id="fc-dot" class="fp-dot fc" aria-hidden="true"></span>
+      </div>
+      <div class="fp-gutter" aria-hidden="true"><span id="fc-tag" class="fp-price-tag fc"></span></div>
+    </div>
+    <div class="fp-xaxis" aria-hidden="true"><span id="x-left">60 trading days ago</span><span id="x-right"></span></div>
+    <p class="fp-note"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="8" cy="8" r="6.25"></circle><path d="M8 7.25V11"></path><path d="M8 5V5.01"></path></svg><span>Backtest: the last <span id="n-h"></span> days were held out, the model was fitted on everything before them, and its error was compared with simply repeating the last close. MAPE <span id="n-mape" class="fp-mono"></span>.</span></p>
+  </div>
+</section>
+
+<section class="fp-two">
+  <article id="comm" class="fp-card fp-comm" aria-labelledby="comm-title">
+    <div class="fp-card-h">
+      <div class="fp-card-h-l">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.75 3.25H13.25V10.75H7.5L4.5 13V10.75H2.75Z"></path><path d="M5.5 6.25H10.5"></path><path d="M5.5 8.25H8.5"></path></svg>
+        <h3 id="comm-title" class="fp-card-title">Claude commentary</h3>
+      </div>
+      <span id="model-tag" class="fp-chip fp-chip-mono fp-muted"></span>
+    </div>
+    <div class="fp-comm-b">
+      <div id="callout" class="fp-callout" hidden>
+        <svg aria-hidden="true" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="#F9CF6E" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2.25L14.5 13.5H1.5Z"></path><path d="M8 6.5V9.25"></path><path d="M8 11.5V11.51"></path></svg>
+        <span><strong>Cut off.</strong> The model stopped at its token budget, so the text ends early. It is shown as is but was not cached; requesting again generates a fresh commentary.</span>
+      </div>
+      <div id="comm-text" class="fp-text"></div>
+    </div>
+    <p id="disclaimer" class="fp-disclaimer">Educational analysis — not investment advice.</p>
+  </article>
+
+  <aside id="hood" class="fp-card fp-hood" aria-labelledby="hood-title">
+    <div class="fp-card-h">
+      <div class="fp-card-h-l">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4.5" y="4.5" width="7" height="7" rx="1"></rect><path d="M6.5 2V4.5"></path><path d="M9.5 2V4.5"></path><path d="M6.5 11.5V14"></path><path d="M9.5 11.5V14"></path><path d="M2 6.5H4.5"></path><path d="M2 9.5H4.5"></path><path d="M11.5 6.5H14"></path><path d="M11.5 9.5H14"></path></svg>
+        <h3 id="hood-title" class="fp-card-title">Under the hood</h3>
+      </div>
+    </div>
+    <div class="fp-card-b">
+      <div id="check" class="fp-check">
+        <span class="fp-label">Numbers-match check</span>
+        <div class="fp-check-row"><span id="check-big" class="fp-check-big"></span><span id="check-chip" class="fp-check-chip"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.5 8.5L6.5 11.5L12.5 4.5"></path></svg><span id="check-chip-text">all numbers traced</span></span></div>
+        <div id="check-meter" class="fp-meter" aria-hidden="true"></div>
+        <span id="check-note" class="fp-check-note">Every number in the text was found in the forecast, its metrics, or values derived from them. Unmatched numbers would be listed here.</span>
+      </div>
+      <dl class="fp-dl">
+        <dt id="dt-tokens">Tokens</dt><dd id="dd-tokens"></dd>
+        <dt id="dt-cost">Cost</dt><dd id="dd-cost"></dd>
+        <dt id="dt-stop">Stop reason</dt><dd id="dd-stop"></dd>
+        <dt id="dt-trunc">Truncated</dt><dd id="dd-trunc"></dd>
+        <dt id="dt-cached">Cached</dt><dd id="dd-cached"></dd>
+        <dt>Rate limit</dt><dd class="fp-quota"><span id="quota-segs" class="fp-quota-segs" aria-hidden="true"></span><span id="quota-text"></span></dd>
+      </dl>
+      <p id="hood-note" class="fp-hood-note">Commentary is cached until midnight UTC, keyed by the numbers it cites. A price move during the day yields fresh text.</p>
+    </div>
+  </aside>
+</section>
+</div>
+</main>
+
+<footer class="fp-footer">
+  <div class="fp-footer-in">
+    <div class="fp-footer-chips">
+      <span class="fp-chip">FastAPI</span><span class="fp-chip">statsmodels</span><span class="fp-chip">Claude (Anthropic API)</span><span class="fp-chip">Azure Container Apps</span><span class="fp-chip">GitHub Actions</span>
+    </div>
+    <div class="fp-footer-links">
+      <a class="fp-ring fp-hov" href="https://forecastpilot.mangotree-f644cfcc.germanywestcentral.azurecontainerapps.io/docs">API &amp; Swagger<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5H12.5V10"></path><path d="M12.5 3.5L4.5 11.5"></path></svg></a>
+      <a class="fp-ring fp-hov" href="https://github.com/timur-us/forecastpilot">Source on GitHub<svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3.5H12.5V10"></path><path d="M12.5 3.5L4.5 11.5"></path></svg></a>
+    </div>
+  </div>
+</footer>
+
+</div>
+<script src="app.js"></script>
+</body>
+</html>
