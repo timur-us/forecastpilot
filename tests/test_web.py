@@ -111,3 +111,13 @@ def test_stylesheet_self_hosts_the_fonts():
         and "url('fonts/JetBrainsMono-latin.woff2')" in css
     )
     assert "font-display: swap" in css
+
+
+def test_waking_state_shows_only_the_two_observable_phases():
+    html = (WEB / "index.html").read_text(encoding="utf-8")
+    js = (WEB / "app.js").read_text(encoding="utf-8")
+    assert html.count('class="fp-step"') == 2
+    assert "one request" in html and 'max="2"' in html
+    # The second phase is one request; nothing in between is simulated.
+    assert "one request:" in js
+    assert "Fitting the model and backtesting" not in js
