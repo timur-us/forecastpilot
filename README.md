@@ -1,5 +1,7 @@
 # ForecastPilot 📈
 
+[![CI](https://github.com/timur-us/forecastpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/timur-us/forecastpilot/actions/workflows/ci.yml)
+
 **Time-series forecasting + AI-generated market commentary, shipped as a production-grade service.**
 
 A FastAPI service that pulls market data, produces a statistical forecast with backtest metrics, and uses Claude (Anthropic API) to generate a bilingual (EN/DE) management commentary — with token/cost tracking and an automated "numbers-match" guard against hallucinated figures.
@@ -8,14 +10,16 @@ A FastAPI service that pulls market data, produces a statistical forecast with b
 
 ## Live demo
 
-**https://forecastpilot.mangotree-f644cfcc.germanywestcentral.azurecontainerapps.io/docs**
+### [▶ Open the app](https://timur-us.github.io/forecastpilot/) · [API & Swagger](https://forecastpilot.mangotree-f644cfcc.germanywestcentral.azurecontainerapps.io/docs)
 
-The service runs on Azure Container Apps with scale-to-zero: the first request after a quiet period takes about 20 seconds while a container starts; every request after that answers in well under a second.
+[![ForecastPilot web app showing the NVDA 30-day forecast, the backtest verdict, the Claude commentary and the numbers-match check](docs/screenshot-result.png)](https://timur-us.github.io/forecastpilot/)
 
-Try it from the Swagger page or directly:
+The app is a static page on GitHub Pages; the API runs on Azure Container Apps with scale-to-zero. The first request after a quiet period takes about 20 seconds while a container starts — the page shows what happens while you wait — and every request after that answers in well under a second.
+
+Try the API from the Swagger page or directly:
 
 ```
-GET /forecast/SAP.DE?horizon=5&commentary=true&language=de
+GET /forecast/NVDA?horizon=30&commentary=true&language=en
 ```
 
 ## Why this exists
@@ -26,11 +30,12 @@ Built to demonstrate end-to-end ML & GenAI engineering: model serving, container
 
 ```mermaid
 flowchart TB
+    W["Web UI · GitHub Pages<br/>static HTML/CSS/JS"] --> I
     C["Client · GET /forecast/{ticker}"] --> I
     subgraph ACA["Azure Container Apps · scale-to-zero"]
         I["Azure ingress · HTTPS"] --> R["FastAPI · rate limit per client<br/>30/h forecast · 5/h commentary"]
-        R --> F["Forecasting<br/>Holt-Winters + naive backtest"]
-        F --> D["Data layer<br/>yfinance · 2y daily closes"]
+        R --> D["Data layer<br/>yfinance · 2y daily closes"]
+        D --> F["Forecasting<br/>Holt-Winters + naive backtest"]
         F --> L["Claude commentary<br/>cache · cost · numbers-match eval"]
     end
     D --> Y["Yahoo Finance"]
@@ -45,6 +50,7 @@ Deployment pipeline (`.github/workflows/ci.yml`):
 flowchart LR
     P["Push to main"] --> T["ruff + pytest"] --> B["Docker build"]
     B --> R["Push to ACR<br/>tag = commit SHA"] --> U["az containerapp update"]
+    T --> G["GitHub Pages<br/>web/ changed"]
 ```
 
 ## API
@@ -52,8 +58,8 @@ flowchart LR
 | Endpoint | Description |
 | --- | --- |
 | `GET /health` | Liveness check, returns `{"status": "ok"}` |
-| `GET /forecast/{ticker}` | Forecast for a Yahoo Finance ticker (e.g. `SAP.DE`, `MSFT`), optional commentary |
-| `GET /` | Redirects to `/docs` (Swagger UI); `/redoc` is available as well |
+| `GET /forecast/{ticker}` | Forecast for a Yahoo Finance ticker (e.g. `NVDA`, or `SAP.DE` for a Xetra listing), optional commentary |
+| `GET /` | Redirects to the web app; `/docs` (Swagger UI) and `/redoc` document the API |
 
 Query parameters of `/forecast/{ticker}`:
 
@@ -75,47 +81,54 @@ The `eval` block is the numbers-match guard: every number in the text is traced 
 
 ### Example
 
-`GET /forecast/SAP.DE?horizon=5&commentary=true&language=de` — a live response from the deployed service (2026-10-21), shortened:
+`GET /forecast/NVDA?horizon=30&commentary=true&language=en` — a live response from the deployed service (2026-10-22, recorded before the `history` field was added), shortened:
 
 ```json
 {
-  "ticker": "SAP.DE",
-  "horizon_days": 5,
-  "last_close": 201.55,
-  "forecast": [201.44, 201.43, 201.42, 201.41, 201.4],
+  "ticker": "NVDA",
+  "horizon_days": 30,
+  "last_close": 221.97,
+  "forecast": [221.78, 221.93, 222.09, "…", 226.03, 226.18, 226.34],
   "metrics": {
-    "backtest_horizon": 5,
-    "mae_model": 2.7679,
-    "mae_naive": 2.616,
-    "mape_model_pct": 1.38,
-    "beats_naive": false
+    "backtest_horizon": 30,
+    "mae_model": 6.1651,
+    "mae_naive": 6.4573,
+    "mape_model_pct": 2.77,
+    "beats_naive": true
   },
   "commentary": {
-    "text": "**Kursbewegung:** SAP.DE schloss zuletzt bei 201,55. … (rendered below)",
+    "text": "**1. Price movement**\nNVDA last closed at 221.97. … (rendered below)",
     "model": "claude-sonnet-5-5",
-    "input_tokens": 462,
-    "output_tokens": 362,
-    "cost_usd": 0.004544,
+    "input_tokens": 461,
+    "output_tokens": 265,
+    "cost_usd": 0.003572,
     "eval": {"numbers_checked": 8, "numbers_matched": 8, "unmatched": [], "passed": true},
     "stop_reason": "end_turn",
     "truncated": false,
-    "generated_at": "2026-10-21T23:19:45+00:00",
+    "generated_at": "2026-10-22T12:17:50+00:00",
     "cached": false
   }
 }
 ```
 
-The commentary text (`language=de`), rendered:
+The commentary text, rendered:
 
-> **Kursbewegung:** SAP.DE schloss zuletzt bei 201,55. Die Prognose startet bei 201,44 und endet nach 5 Handelstagen bei 201,40. Das entspricht einer praktisch unveränderten Kursentwicklung.
+> **1. Price movement**
+> NVDA last closed at 221.97. The forecast starts at 221.78 and ends at 226.34 after 30 trading days, which is above the last close.
 >
-> **Modellgüte:** Im Backtest (Horizont: 5 Tage) liegt der mittlere absolute Fehler des Modells bei 2,7679, der des naiven Vergleichsmodells bei 2,616. Der MAPE des Modells beträgt 1,38 %. Das Modell schlägt die naive Baseline nicht (beats_naive: False).
+> **2. Model quality**
+> Over a 30-day backtest horizon, the model's MAE was 6.1651 versus 6.4573 for the naive baseline. Its MAPE was 2.77%. beats_naive is True, so the model beat the naive baseline, though the margin is narrow.
 >
-> **Einschränkung:** Die Prognose deutet keine nennenswerte Kursänderung an. Da das Modell im Backtest nicht besser abschneidet als die naive Fortschreibung, hat sie nur begrenzten Zusatznutzen. Sie ist keine Aussage über tatsächliche künftige Kurse oder Risiken.
+> **3. Interpretation**
+> The forecast is a statistical projection from past price patterns. It does not account for earnings, news, or market shocks. A backtest edge over the naive baseline does not guarantee future accuracy. The forecast should be read as one input among several, not as a prediction of the outcome.
 >
-> Bildungsanalyse — keine Anlageberatung.
+> Educational analysis — not investment advice.
 
-A daily Holt-Winters forecast often does not beat the naive baseline over a few trading days; the example shows this deliberately. The point of the service is the transparent pipeline around the forecast — backtest metrics, a commentary that only uses the computed numbers, and a check that proves it.
+Whether the model beats the naive baseline depends on the ticker, the window and the horizon. The earlier 5-day SAP.DE example lost to the baseline; this 30-day NVDA example wins by a narrow margin. Neither is evidence of forecasting skill: it is one backtest window per request, and a trend that happened to continue is not a model that knows the future. The point of the service is that the number is computed, shown and never hidden — switch the horizon in the app and watch the verdict change.
+
+### What the guard caught — and what it missed
+
+The numbers-match guard has been wrong in both directions. Early on it produced false positives on German commentary: a decimal such as `18,6936` was split at the third digit ([`3efe903`](https://github.com/timur-us/forecastpilot/commit/3efe903), 2026-08-09), and the ordinals of the fixed three-part structure (`**1. Kursbewegung**`) and ambiguous forms like `41,828` were read as invented figures ([`ac729d7`](https://github.com/timur-us/forecastpilot/commit/ac729d7), 2026-09-02). The example above contains exactly that pattern — `**1. Price movement**` — which is why the guard counts 8 numbers rather than 11. It also missed a case: on a cache hit it reported `passed` for commentary that belonged to older prices, because the stored evaluation was returned along with the stored text; since [#5](https://github.com/timur-us/forecastpilot/pull/5) the cache key includes the numbers the text cites and the check is recomputed on every hit. These cases, like the rest of the behaviour, are pinned down by the 65 offline tests.
 
 ### Errors
 
@@ -166,10 +179,20 @@ uvicorn app.main:app --reload
 
 Without uv: `python3.11 -m venv .venv`, then `pip install -r requirements-dev.txt`.
 
+To run the web app against the local API, allow its origin and serve `web/` statically:
+
+```bash
+CORS_ORIGINS=http://localhost:8080 uvicorn app.main:app --reload   # API on :8000
+python -m http.server 8080 --directory web                         # page on :8080
+# open http://localhost:8080/?api=http://127.0.0.1:8000
+```
+
+The `?api=` override is accepted for `localhost` and `127.0.0.1` only; the published page always talks to the Azure API.
+
 Checks (the same ones CI runs):
 
 ```bash
-ruff check . && pytest -q
+ruff check . && ruff format --check . && pytest -q
 ```
 
 Runtime dependencies are pinned in `requirements.txt` to the versions running in production; `requirements-dev.txt` adds `pytest`, `httpx` and `ruff`. The tests run offline — market data and the Anthropic client are replaced by fakes.
@@ -183,7 +206,7 @@ docker run --env-file .env -p 8000:8000 forecastpilot
 
 ## Deployment
 
-Every push to `main` runs `.github/workflows/ci.yml`: `ruff check` and `pytest` on Python 3.11, a Docker build, then — on `main` only — the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az containerapp update`, which also sets the model and pricing variables. A new revision takes traffic once it is healthy; the previous one serves until then. Pull requests run lint, tests and the Docker build without deploying.
+Every push and pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff format --check` and `pytest` on Python 3.11, then a Docker build. On `main` a `changes` job diffs the push against the previous head and gates two deployments: when `app/`, `requirements*.txt`, the `Dockerfile` or the workflow changed, the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az containerapp update`, which also sets the model, pricing and CORS variables (a new revision takes traffic once it is healthy; the previous one serves until then); when `web/` changed, the page is published to GitHub Pages. Documentation-only changes deploy nothing.
 
 ## Roadmap
 
@@ -194,7 +217,8 @@ Every push to `main` runs `.github/workflows/ci.yml`: `ruff check` and `pytest` 
 - [x] **W5** Observability — token/cost metrics, LLM eval guard (numbers-match)
 - [ ] **W5** Application Insights
 - [x] **W6** Polish — live demo URL, architecture diagram
-- [ ] **W6** Screenshots
+- [x] **W6** Screenshots
+- [x] **Web UI** — static page on GitHub Pages with the forecast, the verdict, the commentary and the guard result
 - [ ] **W7** RAG add-on — commentary grounded in uploaded reports, with citations
 
 ## Cost controls
