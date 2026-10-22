@@ -17,6 +17,7 @@ jobs:
           cache-dependency-path: requirements*.txt
       - run: pip install -r requirements-dev.txt
       - run: ruff check .
+      - run: ruff format --check .
       - run: pytest -q
 
   docker-build:
@@ -42,6 +43,8 @@ jobs:
       ANTHROPIC_PRICE_OUTPUT_PER_MTOK: "10.0"
       # Container Apps ingress network; its X-Forwarded-For identifies the caller.
       TRUSTED_PROXY_CIDRS: 100.64.0.0/10
+      # Browser origin of the web UI on GitHub Pages (origin only, no path).
+      CORS_ORIGINS: https://timur-us.github.io
     steps:
       - uses: actions/checkout@v4
       - name: Build image
@@ -62,4 +65,5 @@ jobs:
               ANTHROPIC_MODEL=${{ env.ANTHROPIC_MODEL }} \
               ANTHROPIC_PRICE_INPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_INPUT_PER_MTOK }} \
               ANTHROPIC_PRICE_OUTPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_OUTPUT_PER_MTOK }} \
-              TRUSTED_PROXY_CIDRS=${{ env.TRUSTED_PROXY_CIDRS }}
+              TRUSTED_PROXY_CIDRS=${{ env.TRUSTED_PROXY_CIDRS }} \
+              CORS_ORIGINS=${{ env.CORS_ORIGINS }}

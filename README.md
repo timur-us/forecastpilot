@@ -65,7 +65,7 @@ Query parameters of `/forecast/{ticker}`:
 
 Response fields:
 
-- `ticker`, `horizon_days`, `last_close`, `forecast` (one value per trading day)
+- `ticker`, `horizon_days`, `last_close`, `forecast` (one value per trading day), `history` (the last 60 closes as `{date, close}`)
 - `metrics`: `backtest_horizon`, `mae_model`, `mae_naive`, `mape_model_pct`, `beats_naive`
 - `commentary` (only with `commentary=true`): `text`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `eval`, `stop_reason`, `truncated`, `generated_at`, `cached`
 
@@ -129,7 +129,7 @@ A daily Holt-Winters forecast often does not beat the naive baseline over a few 
 
 ### Rate limits and caching
 
-- Plain forecasts: `30/hour` per client; forecasts with commentary: `5/hour` per client (each one is a paid LLM call). Both are configurable, see below.
+- Plain forecasts: `30/hour` per client; forecasts with commentary: `5/hour` per client (each one is a paid LLM call). Both are configurable, see below. Every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (Unix timestamp, may carry a fraction) plus `Retry-After` (seconds until the window resets).
 - The client is the caller's address. Behind the Azure Container Apps ingress it is taken from `X-Forwarded-For`, trusting only hops from the ingress network (`TRUSTED_PROXY_CIDRS`); entries a caller adds itself are never used.
 - Commentary is cached in-process until UTC midnight, keyed by ticker, language, horizon and the numbers the text cites (last close, forecast start and end). A price move during the trading day therefore yields fresh text; unchanged numbers reuse the block.
 - With `cached: true`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `stop_reason` and `generated_at` refer to the original generation (no new LLM call); `truncated` is always `false` on a hit because only complete replies are stored; `eval` is recomputed against the response it is part of.
@@ -148,6 +148,7 @@ Copy `.env.example` to `.env` for local runs. In production the key is an Azure 
 | `RATE_LIMIT_COMMENTARY` | `5/hour` | Per-client limit for forecasts with commentary |
 | `COMMENTARY_CACHE_ENABLED` | `true` | `false` always calls the LLM |
 | `TRUSTED_PROXY_CIDRS` | — | Networks of trusted reverse proxies; production sets `100.64.0.0/10` (Container Apps ingress) |
+| `CORS_ORIGINS` | — | Browser origins allowed to call the API; production sets the GitHub Pages origin of the web UI |
 
 Pricing source: https://platform.claude.com/docs/en/about-claude/pricing
 

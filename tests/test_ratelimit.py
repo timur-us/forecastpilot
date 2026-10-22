@@ -8,19 +8,16 @@ would share the same counter bucket even if one governs plain forecasts
 and the other commentary.
 """
 
-import numpy as np
-import pandas as pd
 from fastapi.testclient import TestClient
 
 from app.main import app
+from tests.conftest import price_series
 
 client = TestClient(app)
 
 
 def _mock_series(monkeypatch):
-    rng = np.random.default_rng(11)
-    trend = np.linspace(50, 60, 300)
-    series = pd.Series(trend + rng.normal(0, 1.0, 300))
+    series = price_series(seed=11)
     monkeypatch.setattr("app.main._load_close_series", lambda ticker: series)
 
 
@@ -38,6 +35,11 @@ def test_commentary_rate_limit_returns_429(monkeypatch):
     assert all(r.status_code == 503 for r in allowed)
     assert blocked.status_code == 429
     assert "detail" in blocked.json()
+    # The 429 carries the limit headers the web UI reads.
+    assert blocked.headers["x-ratelimit-limit"] == "2"
+    assert blocked.headers["x-ratelimit-remaining"] == "0"
+    assert float(blocked.headers["x-ratelimit-reset"]) > 0  # Unix timestamp
+    assert int(blocked.headers["retry-after"]) >= 0
 
 
 def test_plain_forecast_limit_is_independent_of_commentary_limit(monkeypatch):
@@ -80,3 +82,30 @@ def test_commentary_limit_is_per_caller_behind_trusted_proxy(monkeypatch):
     assert blocked.status_code == 429
     assert still_blocked.status_code == 429  # the ingress-appended address wins
     assert other.status_code == 503  # a different caller has its own budget
+
+
+def test_plain_forecast_response_carries_its_limit_headers(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_FORECAST", "7/hour")
+    _mock_series(monkeypatch)
+
+    r = client.get("/forecast/AAPL")
+
+    assert r.status_code == 200
+    assert r.headers["x-ratelimit-limit"] == "7"
+    assert r.headers["x-ratelimit-remaining"] == "6"
+    assert r.headers.get_list("x-ratelimit-limit") == ["7"]  # injected once
+    assert float(r.headers["x-ratelimit-reset"]) > 0  # Unix timestamp
+
+
+def test_commentary_response_carries_the_commentary_limit_headers(monkeypatch):
+    monkeypatch.setenv("RATE_LIMIT_COMMENTARY", "6/hour")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "test-key")
+    monkeypatch.setattr("app.main.generate_commentary", lambda **kw: {"text": "ok"})
+    _mock_series(monkeypatch)
+
+    r = client.get("/forecast/AAPL", params={"commentary": True})
+
+    assert r.status_code == 200
+    assert r.json()["commentary"] == {"text": "ok"}
+    assert r.headers["x-ratelimit-limit"] == "6"
+    assert r.headers["x-ratelimit-remaining"] == "5"
