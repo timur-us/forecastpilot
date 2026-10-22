@@ -12,9 +12,9 @@ A FastAPI service that pulls market data, produces a statistical forecast with b
 
 ### [▶ Open the app](https://timur-us.github.io/forecastpilot/) · [API & Swagger](https://forecastpilot.mangotree-f644cfcc.germanywestcentral.azurecontainerapps.io/docs)
 
-[![ForecastPilot web app showing the NVDA 30-day forecast, the backtest verdict, the Claude commentary and the numbers-match check](docs/screenshot-result.png)](https://timur-us.github.io/forecastpilot/)
+The web app is a static page on GitHub Pages; the API runs on Azure Container Apps with scale-to-zero. The first request after a quiet period takes about 20 seconds while a container starts — the page shows what happens while you wait — and every request after that answers in well under a second.
 
-The app is a static page on GitHub Pages; the API runs on Azure Container Apps with scale-to-zero. The first request after a quiet period takes about 20 seconds while a container starts — the page shows what happens while you wait — and every request after that answers in well under a second.
+[![ForecastPilot web app showing the NVDA 30-day forecast, the backtest verdict, the Claude commentary and the numbers-match check](docs/screenshot-result.png)](https://timur-us.github.io/forecastpilot/)
 
 Try the API from the Swagger page or directly:
 
@@ -72,7 +72,7 @@ Query parameters of `/forecast/{ticker}`:
 Response fields:
 
 - `ticker`, `horizon_days`, `last_close`, `forecast` (one value per trading day), `history` (the last 60 closes as `{date, close}`)
-- `metrics`: `backtest_horizon`, `mae_model`, `mae_naive`, `mape_model_pct`, `beats_naive`
+- `metrics`: `backtest_horizon`, `mae_model`, `mae_naive`, `mape_model_pct`, `beats_naive` — or `note` when the series is too short for a backtest (at most twice the horizon in closes); the app then shows the forecast without a verdict
 - `commentary` (only with `commentary=true`): `text`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `eval`, `stop_reason`, `truncated`, `generated_at`, `cached`
 
 The `eval` block is the numbers-match guard: every number in the text is traced back to the forecast, its metrics or values derived from them (`numbers_checked`, `numbers_matched`, `unmatched`, `passed`). It is an observability signal, not a gate — a failed check does not block the response.
@@ -81,7 +81,7 @@ The `eval` block is the numbers-match guard: every number in the text is traced 
 
 ### Example
 
-`GET /forecast/NVDA?horizon=30&commentary=true&language=en` — a live response from the deployed service (2026-10-22, recorded before the `history` field was added), shortened:
+`GET /forecast/NVDA?horizon=30&commentary=true&language=en` — a live response from the deployed service (2026-10-22, 12:17 UTC — an earlier run than the screenshot above, recorded before the `history` field was added), shortened:
 
 ```json
 {
@@ -137,12 +137,12 @@ The numbers-match guard has been wrong in both directions. Early on it produced 
 | `404` | No market data for the ticker |
 | `422` | Invalid parameter, or fewer than 60 daily closes of history |
 | `429` | Rate limit exceeded (see below) |
-| `502` | `LLM call failed: <reason>` — `authentication`, `rate limit`, `network`, `upstream error (<status>)` or `empty response` |
+| `502` | `LLM call failed: <reason>` — `authentication`, `insufficient credits or permissions`, `rate limit`, `network`, `upstream error (<status>)`, `refusal`, `empty response (stop_reason=…)` or `unexpected error` |
 | `503` | `ANTHROPIC_API_KEY not configured` |
 
 ### Rate limits and caching
 
-- Plain forecasts: `30/hour` per client; forecasts with commentary: `5/hour` per client (each one is a paid LLM call). Both are configurable, see below. Every response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (Unix timestamp, may carry a fraction) plus `Retry-After` (seconds until the window resets).
+- Plain forecasts: `30/hour` per client; forecasts with commentary: `5/hour` per client (each one is a paid LLM call). Both are configurable, see below. Every `/forecast` response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (Unix timestamp, may carry a fraction) plus `Retry-After` (seconds until the window resets).
 - The client is the caller's address. Behind the Azure Container Apps ingress it is taken from `X-Forwarded-For`, trusting only hops from the ingress network (`TRUSTED_PROXY_CIDRS`); entries a caller adds itself are never used.
 - Commentary is cached in-process until UTC midnight, keyed by ticker, language, horizon and the numbers the text cites (last close, forecast start and end). A price move during the trading day therefore yields fresh text; unchanged numbers reuse the block.
 - With `cached: true`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `stop_reason` and `generated_at` refer to the original generation (no new LLM call); `truncated` is always `false` on a hit because only complete replies are stored; `eval` is recomputed against the response it is part of.
@@ -161,7 +161,8 @@ Copy `.env.example` to `.env` for local runs. In production the key is an Azure 
 | `RATE_LIMIT_COMMENTARY` | `5/hour` | Per-client limit for forecasts with commentary |
 | `COMMENTARY_CACHE_ENABLED` | `true` | `false` always calls the LLM |
 | `TRUSTED_PROXY_CIDRS` | — | Networks of trusted reverse proxies; production sets `100.64.0.0/10` (Container Apps ingress) |
-| `CORS_ORIGINS` | — | Browser origins allowed to call the API; production sets the GitHub Pages origin of the web UI |
+| `CORS_ORIGINS` | — | Browser origins allowed to call the API; production sets the GitHub Pages origin of the web app |
+| `WEB_UI_URL` | `https://timur-us.github.io/forecastpilot/` | Where `GET /` sends browsers |
 
 Pricing source: https://platform.claude.com/docs/en/about-claude/pricing
 
@@ -206,7 +207,7 @@ docker run --env-file .env -p 8000:8000 forecastpilot
 
 ## Deployment
 
-Every push and pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff format --check` and `pytest` on Python 3.11, then a Docker build. On `main` a `changes` job diffs the push against the previous head and gates two deployments: when `app/`, `requirements*.txt`, the `Dockerfile` or the workflow changed, the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az containerapp update`, which also sets the model, pricing and CORS variables (a new revision takes traffic once it is healthy; the previous one serves until then); when `web/` changed, the page is published to GitHub Pages. Documentation-only changes deploy nothing.
+Every push to `main` and every pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff format --check` and `pytest` on Python 3.11, then a Docker build. On `main` a `changes` job diffs the push against the previous head and gates two deployments: when `app/`, `requirements.txt`, the `Dockerfile`, `.dockerignore` or the workflow changed, the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az containerapp update`, which also sets the model, pricing, proxy-trust and CORS variables (a new revision takes traffic once it is healthy; the previous one serves until then); when `web/` changed, the page is published to GitHub Pages. Documentation-only changes deploy nothing; a manual run (`workflow_dispatch`) can redeploy either part.
 
 ## Roadmap
 
@@ -218,7 +219,7 @@ Every push and pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff
 - [ ] **W5** Application Insights
 - [x] **W6** Polish — live demo URL, architecture diagram
 - [x] **W6** Screenshots
-- [x] **Web UI** — static page on GitHub Pages with the forecast, the verdict, the commentary and the guard result
+- [x] **Web app** — static page on GitHub Pages with the forecast, the verdict, the commentary and the guard result
 - [ ] **W7** RAG add-on — commentary grounded in uploaded reports, with citations
 
 ## Cost controls
