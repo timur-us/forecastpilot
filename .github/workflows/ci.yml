@@ -62,8 +62,8 @@ jobs:
             -n forecastpilot -g forecastpilot-rg \
             --image ca06d26caabdacr.azurecr.io/forecastpilot:${{ github.sha }} \
             --set-env-vars \
-              ANTHROPIC_MODEL=${{ env.ANTHROPIC_MODEL }} \
-              ANTHROPIC_PRICE_INPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_INPUT_PER_MTOK }} \
-              ANTHROPIC_PRICE_OUTPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_OUTPUT_PER_MTOK }} \
-              TRUSTED_PROXY_CIDRS=${{ env.TRUSTED_PROXY_CIDRS }} \
-              CORS_ORIGINS=${{ env.CORS_ORIGINS }}
+              "ANTHROPIC_MODEL=${{ env.ANTHROPIC_MODEL }}" \
+              "ANTHROPIC_PRICE_INPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_INPUT_PER_MTOK }}" \
+              "ANTHROPIC_PRICE_OUTPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_OUTPUT_PER_MTOK }}" \
+              "TRUSTED_PROXY_CIDRS=${{ env.TRUSTED_PROXY_CIDRS }}" \
+              "CORS_ORIGINS=${{ env.CORS_ORIGINS }}"

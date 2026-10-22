@@ -11,7 +11,7 @@ and the other commentary.
 from fastapi.testclient import TestClient
 
 from app.main import app
-from tests.conftest import price_series
+from tests.helpers import price_series
 
 client = TestClient(app)
 

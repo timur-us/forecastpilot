@@ -93,13 +93,30 @@ def test_cors_is_off_without_configured_origins(mock_prices):
 @pytest.fixture
 def cors_client(monkeypatch):
     """The app as deployed: CORS_ORIGINS set before the module is imported."""
+    # The reload re-runs load_dotenv(); keep a local .env out of the test.
+    monkeypatch.setattr("dotenv.load_dotenv", lambda *a, **k: True)
     monkeypatch.setenv(
-        "CORS_ORIGINS", "https://timur-us.github.io, http://localhost:8080"
+        "CORS_ORIGINS", "https://timur-us.github.io/, http://localhost:8080"
     )
     module = importlib.reload(app_main)
     yield TestClient(module.app)
     monkeypatch.delenv("CORS_ORIGINS", raising=False)
     importlib.reload(app_main)
+
+
+def test_cors_origins_are_normalised_and_validated(monkeypatch):
+    monkeypatch.setenv(
+        "CORS_ORIGINS", " https://timur-us.github.io/ ,http://localhost:8080"
+    )
+    assert app_main._cors_origins() == [
+        "https://timur-us.github.io",
+        "http://localhost:8080",
+    ]
+
+    for bad in ("*", "timur-us.github.io", "https://timur-us.github.io/forecastpilot/"):
+        monkeypatch.setenv("CORS_ORIGINS", bad)
+        with pytest.raises(ValueError):
+            app_main._cors_origins()
 
 
 def test_cors_allows_the_configured_origin_and_exposes_limit_headers(

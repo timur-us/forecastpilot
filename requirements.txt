@@ -11,3 +11,4 @@ yfinance==1.7.0
 anthropic==1.15.0
 python-dotenv==1.2.4
 slowapi==0.1.10
+limits==5.8.0

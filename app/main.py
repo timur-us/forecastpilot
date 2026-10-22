@@ -158,9 +158,7 @@ HISTORY_POINTS = 60
 def _history(series) -> list[ClosePoint]:
     """The last HISTORY_POINTS closes with their dates, oldest first."""
     return [
-        ClosePoint(
-            date=pd.Timestamp(day).strftime("%Y-%m-%d"), close=round(float(v), 2)
-        )
+        ClosePoint(date=pd.Timestamp(day).date(), close=round(float(v), 2))
         for day, v in series.tail(HISTORY_POINTS).items()
     ]
 
@@ -182,7 +180,7 @@ def health() -> dict:
 @limiter.limit(_forecast_rate_limit, exempt_when=_wants_commentary)
 def forecast(
     request: Request,
-    response: Response,
+    response: Response,  # slowapi writes the rate-limit headers onto it
     ticker: str,
     horizon: int = Query(default=30, ge=5, le=90),
     commentary: bool = Query(
