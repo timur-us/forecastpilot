@@ -1,6 +1,7 @@
 """LLM commentary layer — Claude via the Anthropic API, with token tracking."""
 
 import os
+from dataclasses import dataclass
 from datetime import datetime, timezone
 
 import anthropic
@@ -36,6 +37,13 @@ def describe_llm_error(exc: Exception) -> str:
     return "LLM call failed: unexpected error"
 
 
+# Labels the prompt that produced a commentary block: SYSTEM plus the user
+# turn built by user_prompt. A date plus a counter; bump it with every edit
+# to either text so recorded evaluation results stay attributable to one
+# prompt. This first label marks the start of versioning: the text itself
+# has not changed since 2026-08-09 (d3e40aa).
+PROMPT_VERSION = "2026-10-23.1"
+
 SYSTEM = (
     "You are a markets analyst writing short, factual commentary for a management "
     "audience. Write in exactly three parts, in this fixed order:\n"
@@ -62,9 +70,85 @@ SYSTEM = (
 MAX_TOKENS = 2048
 
 
+@dataclass(frozen=True)
+class ModelReply:
+    """What one model call returned, before cache, cost and eval are added.
+
+    This is the seam for replacing the model step (for example with structured
+    outputs): only call_model changes, everything around it keeps consuming
+    this reply.
+    """
+
+    text: str
+    stop_reason: str | None
+    model: str
+    input_tokens: int
+    output_tokens: int
+
+
 def _fingerprint(last_close: float, forecast: list) -> tuple[str, str, str]:
     """The numbers the prompt cites verbatim, formatted as the prompt does."""
     return (f"{last_close:.2f}", f"{forecast[0]:.2f}", f"{forecast[-1]:.2f}")
+
+
+def user_prompt(payload: dict, language: str) -> str:
+    """The user turn: language, ticker, the cited numbers (two decimals), metrics."""
+    lang = "English" if language == "en" else "German"
+    forecast = payload["forecast"]
+    return (
+        f"Write the commentary in {lang}.\n"
+        f"Ticker: {payload['ticker'].upper()}\n"
+        f"Last close: {payload['last_close']:.2f}\n"
+        f"Forecast start: {forecast[0]:.2f} | Forecast end: {forecast[-1]:.2f} "
+        f"({len(forecast)} trading days)\n"
+        f"Backtest metrics: {payload['metrics']}"
+    )
+
+
+def call_model(payload: dict, language: str) -> ModelReply:
+    """One model call: build the prompt, send it, pull the text out of the reply.
+
+    `payload` carries ticker, last_close, forecast, metrics and horizon_days —
+    the same dict the numbers check reads. Raises CommentaryError when the
+    reply is a refusal or holds no text; a reply cut off at MAX_TOKENS is
+    returned with stop_reason "max_tokens" for the caller to flag.
+    """
+    client = Anthropic()  # reads ANTHROPIC_API_KEY from the environment
+    model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
+
+    msg = client.messages.create(
+        model=model,
+        max_tokens=MAX_TOKENS,
+        system=SYSTEM,
+        messages=[{"role": "user", "content": user_prompt(payload, language)}],
+    )
+
+    # Responses may interleave thinking blocks with text; the commentary is the
+    # concatenation of all text blocks.
+    text = "".join(
+        block.text for block in msg.content if getattr(block, "type", None) == "text"
+    ).strip()
+    if msg.stop_reason == "refusal":
+        # Partial output of a refused request is incomplete by definition.
+        raise CommentaryError("refusal")
+    if not text:
+        raise CommentaryError(f"empty response (stop_reason={msg.stop_reason})")
+    return ModelReply(
+        text=text,
+        stop_reason=msg.stop_reason,
+        model=model,
+        input_tokens=msg.usage.input_tokens,
+        output_tokens=msg.usage.output_tokens,
+    )
+
+
+def cost_usd(input_tokens: int, output_tokens: int) -> float:
+    """Estimated cost of one call from the configured per-million-token prices."""
+    price_input = float(os.getenv("ANTHROPIC_PRICE_INPUT_PER_MTOK", "2.0"))
+    price_output = float(os.getenv("ANTHROPIC_PRICE_OUTPUT_PER_MTOK", "10.0"))
+    return round(
+        input_tokens / 1e6 * price_input + output_tokens / 1e6 * price_output, 6
+    )
 
 
 def generate_commentary(
@@ -79,10 +163,13 @@ def generate_commentary(
     Cached for the rest of the UTC day per (ticker, language, horizon) and
     the numbers the text cites — see app.cache. On a cache hit the numbers
     check runs against the current payload, so `eval` always describes the
-    response it is part of.
+    response it is part of. The key carries no prompt version: the cache
+    lives in the process that holds PROMPT_VERSION, and a prompt change
+    ships as a new process with an empty cache.
     """
     horizon_days = len(forecast)
     payload = {
+        "ticker": ticker,
         "last_close": last_close,
         "forecast": forecast,
         "metrics": metrics,
@@ -99,59 +186,24 @@ def generate_commentary(
             "cached": True,
         }
 
-    client = Anthropic()  # reads ANTHROPIC_API_KEY from the environment
-    model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
-    price_input = float(os.getenv("ANTHROPIC_PRICE_INPUT_PER_MTOK", "2.0"))
-    price_output = float(os.getenv("ANTHROPIC_PRICE_OUTPUT_PER_MTOK", "10.0"))
-
-    lang = "English" if language == "en" else "German"
-    prompt = (
-        f"Write the commentary in {lang}.\n"
-        f"Ticker: {ticker.upper()}\n"
-        f"Last close: {last_close:.2f}\n"
-        f"Forecast start: {forecast[0]:.2f} | Forecast end: {forecast[-1]:.2f} "
-        f"({len(forecast)} trading days)\n"
-        f"Backtest metrics: {metrics}"
-    )
-
-    msg = client.messages.create(
-        model=model,
-        max_tokens=MAX_TOKENS,
-        system=SYSTEM,
-        messages=[{"role": "user", "content": prompt}],
-    )
-
-    cost_usd = round(
-        msg.usage.input_tokens / 1e6 * price_input
-        + msg.usage.output_tokens / 1e6 * price_output,
-        6,
-    )
-    # Responses may interleave thinking blocks with text; the commentary is the
-    # concatenation of all text blocks.
-    text = "".join(
-        block.text for block in msg.content if getattr(block, "type", None) == "text"
-    ).strip()
-    if msg.stop_reason == "refusal":
-        # Partial output of a refused request is incomplete by definition.
-        raise CommentaryError("refusal")
-    if not text:
-        raise CommentaryError(f"empty response (stop_reason={msg.stop_reason})")
+    reply = call_model(payload, language)
 
     # A reply cut off at the token budget is returned as is and flagged. Only
     # complete replies (end_turn) enter the cache, so the next request tries
     # again instead of repeating a partial text until midnight.
-    truncated = msg.stop_reason == "max_tokens"
+    truncated = reply.stop_reason == "max_tokens"
     result = {
-        "text": text,
-        "model": model,
-        "input_tokens": msg.usage.input_tokens,
-        "output_tokens": msg.usage.output_tokens,
-        "cost_usd": cost_usd,
-        "eval": check_numbers(text, payload),
-        "stop_reason": msg.stop_reason,
+        "text": reply.text,
+        "model": reply.model,
+        "prompt_version": PROMPT_VERSION,
+        "input_tokens": reply.input_tokens,
+        "output_tokens": reply.output_tokens,
+        "cost_usd": cost_usd(reply.input_tokens, reply.output_tokens),
+        "eval": check_numbers(reply.text, payload),
+        "stop_reason": reply.stop_reason,
         "truncated": truncated,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
-    if msg.stop_reason == "end_turn":
+    if reply.stop_reason == "end_turn":
         cache.set(ticker, language, horizon_days, fingerprint, result)
     return {**result, "cached": False}

@@ -42,7 +42,7 @@ flowchart TB
     L --> A["Anthropic API"]
 ```
 
-Infrastructure: Azure Container Apps (scale 0–10 replicas, single-revision mode), image in Azure Container Registry, container console logs in Log Analytics. Every commentary response carries its own token, cost, eval and truncation fields.
+Infrastructure: Azure Container Apps (scale 0–10 replicas, single-revision mode), image in Azure Container Registry, container console logs in Log Analytics. Every commentary response carries its own token, cost, eval, truncation and prompt-version fields.
 
 Deployment pipeline (`.github/workflows/ci.yml`):
 
@@ -73,15 +73,17 @@ Response fields:
 
 - `ticker`, `horizon_days`, `last_close`, `forecast` (one value per trading day), `history` (the last 60 closes as `{date, close}`)
 - `metrics`: `backtest_horizon`, `mae_model`, `mae_naive`, `mape_model_pct`, `beats_naive` — or `note` when the series is too short for a backtest (at most twice the horizon in closes); the app then shows the forecast without a verdict
-- `commentary` (only with `commentary=true`): `text`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `eval`, `stop_reason`, `truncated`, `generated_at`, `cached`
+- `commentary` (only with `commentary=true`): `text`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `cost_usd`, `eval`, `stop_reason`, `truncated`, `generated_at`, `cached`
 
 The `eval` block is the numbers-match guard: every number in the text is traced back to the forecast, its metrics or values derived from them (`numbers_checked`, `numbers_matched`, `unmatched`, `passed`). It is an observability signal, not a gate — a failed check does not block the response.
 
 `truncated` is `true` when the model stopped at its token budget (`stop_reason: "max_tokens"`); such a response is returned as is but never cached, so the next request generates a fresh one. The budget (`MAX_TOKENS` in `app/commentary.py`, currently 2048) covers the model's thinking as well as the text — thinking tokens count toward it even though they are not returned. `truncated` and `eval` are independent signals.
 
+`prompt_version` names the prompt that produced the text (`PROMPT_VERSION` in `app/commentary.py`: a date plus a counter, bumped with every edit to the prompt). The first label, `2026-10-23.1`, marks the start of versioning; the prompt text itself dates from 2026-08-09. It makes commentary from different prompt revisions distinguishable, so evaluation results can be compared across revisions.
+
 ### Example
 
-`GET /forecast/NVDA?horizon=30&commentary=true&language=en` — a live response from the deployed service (2026-10-22, 12:17 UTC — an earlier run than the screenshot above, recorded before the `history` field was added), shortened:
+`GET /forecast/NVDA?horizon=30&commentary=true&language=en` — a live response from the deployed service (2026-10-22, 12:17 UTC — an earlier run than the screenshot above, recorded before the `history` and `prompt_version` fields were added; the prompt text is unchanged since 2026-08-09, so the current `prompt_version` is shown), shortened:
 
 ```json
 {
@@ -99,6 +101,7 @@ The `eval` block is the numbers-match guard: every number in the text is traced 
   "commentary": {
     "text": "**1. Price movement**\nNVDA last closed at 221.97. … (rendered below)",
     "model": "claude-sonnet-5-5",
+    "prompt_version": "2026-10-23.1",
     "input_tokens": 461,
     "output_tokens": 265,
     "cost_usd": 0.003572,
@@ -128,7 +131,7 @@ Whether the model beats the naive baseline depends on the ticker, the window and
 
 ### What the guard caught — and what it missed
 
-The numbers-match guard has been wrong in both directions. Early on it produced false positives on German commentary: a decimal such as `18,6936` was split at the third digit ([`3efe903`](https://github.com/timur-us/forecastpilot/commit/3efe903), 2026-08-09), and the ordinals of the fixed three-part structure (`**1. Kursbewegung**`) and ambiguous forms like `41,828` were read as invented figures ([`ac729d7`](https://github.com/timur-us/forecastpilot/commit/ac729d7), 2026-09-02). The example above contains exactly that pattern — `**1. Price movement**` — which is why the guard counts 8 numbers rather than 11. It also missed a case: on a cache hit it reported `passed` for commentary that belonged to older prices, because the stored evaluation was returned along with the stored text; since [#5](https://github.com/timur-us/forecastpilot/pull/5) the cache key includes the numbers the text cites and the check is recomputed on every hit. These cases, like the rest of the behaviour, are pinned down by the 66 offline tests.
+The numbers-match guard has been wrong in both directions. Early on it produced false positives on German commentary: a decimal such as `18,6936` was split at the third digit ([`3efe903`](https://github.com/timur-us/forecastpilot/commit/3efe903), 2026-08-09), and the ordinals of the fixed three-part structure (`**1. Kursbewegung**`) and ambiguous forms like `41,828` were read as invented figures ([`ac729d7`](https://github.com/timur-us/forecastpilot/commit/ac729d7), 2026-09-02). The example above contains exactly that pattern — `**1. Price movement**` — which is why the guard counts 8 numbers rather than 11. It also missed a case: on a cache hit it reported `passed` for commentary that belonged to older prices, because the stored evaluation was returned along with the stored text; since [#5](https://github.com/timur-us/forecastpilot/pull/5) the cache key includes the numbers the text cites and the check is recomputed on every hit. These cases, like the rest of the behaviour, are pinned down by the 72 offline tests.
 
 ### Errors
 
@@ -145,7 +148,7 @@ The numbers-match guard has been wrong in both directions. Early on it produced 
 - Plain forecasts: `30/hour` per client; forecasts with commentary: `5/hour` per client (each one is a paid LLM call). Both are configurable, see below. Every `/forecast` response carries `X-RateLimit-Limit`, `X-RateLimit-Remaining` and `X-RateLimit-Reset` (Unix timestamp, may carry a fraction) plus `Retry-After` (seconds until the window resets).
 - The client is the caller's address. Behind the Azure Container Apps ingress it is taken from `X-Forwarded-For`, trusting only hops from the ingress network (`TRUSTED_PROXY_CIDRS`); entries a caller adds itself are never used.
 - Commentary is cached in-process until UTC midnight, keyed by ticker, language, horizon and the numbers the text cites (last close, forecast start and end). A price move during the trading day therefore yields fresh text; unchanged numbers reuse the block.
-- With `cached: true`, `model`, `input_tokens`, `output_tokens`, `cost_usd`, `stop_reason` and `generated_at` refer to the original generation (no new LLM call); `truncated` is always `false` on a hit because only complete replies are stored; `eval` is recomputed against the response it is part of.
+- With `cached: true`, `model`, `prompt_version`, `input_tokens`, `output_tokens`, `cost_usd`, `stop_reason` and `generated_at` refer to the original generation (no new LLM call); `truncated` is always `false` on a hit because only complete replies are stored; `eval` is recomputed against the response it is part of.
 
 ## Configuration
 

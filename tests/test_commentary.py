@@ -1,5 +1,6 @@
 """Offline tests for app.commentary — no network, no API keys."""
 
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -143,3 +144,92 @@ def test_describe_llm_error_maps_commentary_error():
     detail = commentary.describe_llm_error(commentary.CommentaryError("empty response"))
 
     assert detail == "LLM call failed: empty response"
+
+
+def test_commentary_block_carries_the_prompt_version(monkeypatch):
+    _install_client(monkeypatch)
+
+    result = _call()
+
+    assert result["prompt_version"] == commentary.PROMPT_VERSION
+    # A date plus a counter, e.g. "2026-10-23.1".
+    assert re.fullmatch(r"\d{4}-\d{2}-\d{2}\.\d+", commentary.PROMPT_VERSION)
+
+
+def test_call_model_returns_the_raw_reply_and_sends_the_prompt(monkeypatch):
+    client = _install_client(monkeypatch, [_thinking(), _text("Raw text.")])
+    monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
+    payload = {
+        "ticker": "sap.de",
+        "last_close": 123.456,
+        "forecast": [120.0, 121.5, 125.0],
+        "metrics": {"mae_model": 6.8767},
+        "horizon_days": 3,
+    }
+
+    reply = commentary.call_model(payload, "de")
+
+    assert reply == commentary.ModelReply(
+        text="Raw text.",
+        stop_reason="end_turn",
+        model="claude-sonnet-5-5",
+        input_tokens=1000,
+        output_tokens=2000,
+    )
+    sent = client.messages.last_kwargs
+    assert sent["system"] == commentary.SYSTEM
+    assert sent["max_tokens"] == commentary.MAX_TOKENS
+    assert sent["messages"] == [
+        {"role": "user", "content": commentary.user_prompt(payload, "de")}
+    ]
+
+
+def test_user_prompt_names_the_language_and_prints_two_decimals():
+    payload = {
+        "ticker": "sap.de",
+        "last_close": 123.456,
+        "forecast": [120.0, 121.5, 125.0],
+        "metrics": {"mae_model": 6.8767, "beats_naive": False},
+        "horizon_days": 3,
+    }
+
+    prompt = commentary.user_prompt(payload, "de")
+
+    assert prompt.splitlines() == [
+        "Write the commentary in German.",
+        "Ticker: SAP.DE",
+        "Last close: 123.46",
+        "Forecast start: 120.00 | Forecast end: 125.00 (3 trading days)",
+        "Backtest metrics: {'mae_model': 6.8767, 'beats_naive': False}",
+    ]
+    assert commentary.user_prompt(payload, "en").startswith(
+        "Write the commentary in English."
+    )
+
+
+def test_call_model_raises_on_refusal_and_on_missing_text(monkeypatch):
+    payload = {
+        "ticker": "AAPL",
+        "last_close": 100.0,
+        "forecast": [100.0, 101.0],
+        "metrics": {},
+        "horizon_days": 2,
+    }
+    _install_client(monkeypatch, [_text("Partial")], "refusal")
+    with pytest.raises(commentary.CommentaryError, match="refusal"):
+        commentary.call_model(payload, "en")
+
+    _install_client(monkeypatch, [_thinking()], "end_turn")
+    with pytest.raises(commentary.CommentaryError, match="stop_reason=end_turn"):
+        commentary.call_model(payload, "en")
+
+
+def test_cost_usd_helper_applies_env_prices_and_rounds_to_six_decimals(monkeypatch):
+    monkeypatch.setenv("ANTHROPIC_PRICE_INPUT_PER_MTOK", "3")
+    monkeypatch.setenv("ANTHROPIC_PRICE_OUTPUT_PER_MTOK", "15")
+
+    # 461/1e6 * 3 + 265/1e6 * 15 = 0.001383 + 0.003975
+    assert commentary.cost_usd(461, 265) == 0.005358
+    # 1/1e6 * 3 + 7/1e6 * 15 is 0.00010800000000000001 in float arithmetic;
+    # the rounding makes it the printable 0.000108.
+    assert commentary.cost_usd(1, 7) == 0.000108
