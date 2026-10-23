@@ -215,6 +215,19 @@ def test_generated_at_is_set_and_kept_on_hit(monkeypatch):
     assert second["generated_at"] == "2026-10-20T12:00:00+00:00"
 
 
+def test_stored_block_carries_the_prompt_version_and_a_hit_keeps_it(monkeypatch):
+    _patched_client(monkeypatch)
+
+    first = _call()
+    second = _call()
+
+    assert first["prompt_version"] == commentary.PROMPT_VERSION
+    (stored, _expires_at) = next(iter(cache._store.values()))
+    assert stored["prompt_version"] == commentary.PROMPT_VERSION
+    assert second["cached"] is True
+    assert second["prompt_version"] == commentary.PROMPT_VERSION
+
+
 def test_set_drops_expired_entries():
     stale_key = ("OLD", "en", 2, ("1.00", "1.00", "2.00"))
     cache._store[stale_key] = ({"text": "old"}, time.time() - 1)
