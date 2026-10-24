@@ -1,0 +1,22 @@
+{
+  "id": "en-ko-30-flat",
+  "ticker": "KO",
+  "language": "en",
+  "horizon": 30,
+  "last_close": 69.41,
+  "forecast": [69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41, 69.41],
+  "metrics": {
+    "backtest_horizon": 30,
+    "mae_model": 1.2088,
+    "mae_naive": 1.105,
+    "mape_model_pct": 1.73,
+    "beats_naive": false
+  },
+  "expect": {
+    "language": "en",
+    "verdict": "does_not_beat",
+    "disclaimer": "Educational analysis — not investment advice.",
+    "max_words": 150
+  },
+  "covers": "flat forecast (start = end = last close); beats_naive false"
+}

@@ -1,0 +1,12 @@
+{
+  "case_id": "de-sie-90-beats",
+  "sample": 2,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**1. Kursbewegung**\nDer letzte Schlusskurs von SIE.DE liegt bei 186.42. Die Prognose startet bei 186.90 und endet nach 90 Handelstagen bei 197.35.\n\n**2. Modellgüte**\nIm Backtest über 90 Handelstage erreicht das Modell einen MAE von 5.8842, die naive Baseline einen MAE von 6.9215 (beats_naive: True). Das Modell schlägt die naive Prognose also. Der MAPE des Modells beträgt 3.16 %.\n\n**3. Einschränkung**\nDie Prognose zeigt einen statistischen Pfad, keine Gewissheit. Sie berücksichtigt weder Marktschocks noch Unternehmensnachrichten. Ein guter Backtest garantiert keine künftige Treffgenauigkeit.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 463,
+  "output_tokens": 810,
+  "cost_usd": 0.009026,
+  "generated_at": "2026-10-23T18:47:07+00:00"
+}

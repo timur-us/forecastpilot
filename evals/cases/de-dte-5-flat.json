@@ -1,0 +1,22 @@
+{
+  "id": "de-dte-5-flat",
+  "ticker": "DTE.DE",
+  "language": "de",
+  "horizon": 5,
+  "last_close": 29.17,
+  "forecast": [29.17, 29.17, 29.17, 29.17, 29.17],
+  "metrics": {
+    "backtest_horizon": 5,
+    "mae_model": 0.3815,
+    "mae_naive": 0.354,
+    "mape_model_pct": 1.31,
+    "beats_naive": false
+  },
+  "expect": {
+    "language": "de",
+    "verdict": "does_not_beat",
+    "disclaimer": "Bildungsanalyse — keine Anlageberatung.",
+    "max_words": 150
+  },
+  "covers": "flat forecast; beats_naive false"
+}

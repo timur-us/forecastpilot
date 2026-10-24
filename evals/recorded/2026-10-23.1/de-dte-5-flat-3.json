@@ -1,0 +1,12 @@
+{
+  "case_id": "de-dte-5-flat",
+  "sample": 3,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung:** Die Aktie DTE.DE schloss zuletzt bei 29,17. Die Prognose startet bei 29,17 und endet nach 5 Handelstagen ebenfalls bei 29,17. Das Modell erwartet somit keine Kursveränderung.\n\n**Modellgüte:** Im Backtest (Horizont: 5 Tage) liegt der mittlere absolute Fehler des Modells bei 0,3815, der des naiven Vergleichsmodells bei 0,354. Der MAPE des Modells beträgt 1,31 %. Das Modell schlägt die naive Baseline nicht (beats_naive: False).\n\n**Einschränkung:** Die flache Prognose ist kein Hinweis auf eine sichere Seitwärtsbewegung, sondern entspricht im Wesentlichen dem letzten Schlusskurs. Da das Modell die naive Baseline nicht übertrifft, bietet es keinen belegbaren Mehrwert. Die Prognose sollte nur mit Vorsicht interpretiert werden und ersetzt keine eigene Analyse.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 462,
+  "output_tokens": 406,
+  "cost_usd": 0.004984,
+  "generated_at": "2026-10-23T18:46:27+00:00"
+}

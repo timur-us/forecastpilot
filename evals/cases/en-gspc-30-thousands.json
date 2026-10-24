@@ -1,0 +1,22 @@
+{
+  "id": "en-gspc-30-thousands",
+  "ticker": "^GSPC",
+  "language": "en",
+  "horizon": 30,
+  "last_close": 5812.34,
+  "forecast": [5818.9, 5821.87, 5824.85, 5827.82, 5830.79, 5833.77, 5836.74, 5839.71, 5842.68, 5845.66, 5848.63, 5851.6, 5854.58, 5857.55, 5860.52, 5863.5, 5866.47, 5869.44, 5872.42, 5875.39, 5878.36, 5881.34, 5884.31, 5887.28, 5890.25, 5893.23, 5896.2, 5899.17, 5902.15, 5905.12],
+  "metrics": {
+    "backtest_horizon": 30,
+    "mae_model": 61.2278,
+    "mae_naive": 68.9031,
+    "mape_model_pct": 1.05,
+    "beats_naive": true
+  },
+  "expect": {
+    "language": "en",
+    "verdict": "beats",
+    "disclaimer": "Educational analysis — not investment advice.",
+    "max_words": 150
+  },
+  "covers": "index level above 1,000 (thousands separator in English); beats_naive true"
+}

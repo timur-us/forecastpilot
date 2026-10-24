@@ -1,0 +1,12 @@
+{
+  "case_id": "de-xyz-30-no-backtest",
+  "sample": 1,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung:** Der letzte Schlusskurs von XYZ.DE beträgt 15.42. Die Prognose beginnt bei 15.30 und endet nach 30 Handelstagen bei 14.85. Das entspricht einem erwarteten Rückgang gegenüber dem Prognosestart.\n\n**Modellgüte:** Der Backtest konnte nicht berechnet werden, da die Datenreihe zu kurz ist. Ob das Modell die naive Baseline schlägt (beats_naive), lässt sich daher nicht beurteilen. Eine Aussage zur Treffgenauigkeit ist nicht möglich.\n\n**Einschränkung / Interpretation:** Die Prognose zeigt eine mögliche Tendenz, ist aber ohne validierten Backtest nur eingeschränkt belastbar. Sie ist keine Garantie für den tatsächlichen Kursverlauf und berücksichtigt keine unerwarteten Ereignisse oder Marktveränderungen. Sie sollte allenfalls als ein Input unter mehreren verwendet werden.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 414,
+  "output_tokens": 401,
+  "cost_usd": 0.004838,
+  "generated_at": "2026-10-23T18:47:28+00:00"
+}

@@ -1,0 +1,12 @@
+{
+  "case_id": "en-sndl-5-under-one",
+  "sample": 1,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement:** SNDL last closed at 0.73. The 5-trading-day forecast starts at 0.73 and ends at 0.71, pointing to a slight decline.\n\n**Model quality:** Over a 5-day backtest horizon, the model's mean absolute error (MAE) was 0.0412, against 0.0457 for the naive baseline. Its MAPE was 5.64%. The model beats the naive baseline (beats_naive = True), though only by a modest margin.\n\n**Interpretation:** The forecast is a statistical projection, not a certainty. The projected move from 0.73 to 0.71 is smaller than the model's backtest MAE of 0.0412, so it should not be read as a reliable directional signal. The forecast does not account for news, corporate events, or sudden market shocks.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 461,
+  "output_tokens": 707,
+  "cost_usd": 0.007992,
+  "generated_at": "2026-10-23T18:49:00+00:00"
+}
