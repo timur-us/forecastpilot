@@ -1,0 +1,22 @@
+{
+  "id": "en-tsla-30-negative-drift",
+  "ticker": "TSLA",
+  "language": "en",
+  "horizon": 30,
+  "last_close": 438.52,
+  "forecast": [436.9, 436.05, 435.2, 434.34, 433.49, 432.64, 431.79, 430.93, 430.08, 429.23, 428.38, 427.52, 426.67, 425.82, 424.97, 424.11, 423.26, 422.41, 421.56, 420.7, 419.85, 419.0, 418.15, 417.29, 416.44, 415.59, 414.74, 413.88, 413.03, 412.18],
+  "metrics": {
+    "backtest_horizon": 30,
+    "mae_model": 22.7316,
+    "mae_naive": 19.485,
+    "mape_model_pct": 5.08,
+    "beats_naive": false
+  },
+  "expect": {
+    "language": "en",
+    "verdict": "does_not_beat",
+    "disclaimer": "Educational analysis — not investment advice.",
+    "max_words": 150
+  },
+  "covers": "negative drift (end below start below last close); beats_naive false"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "de-mbg-30-narrow-win",
+  "ticker": "MBG.DE",
+  "language": "de",
+  "horizon": 30,
+  "last_close": 54.37,
+  "forecast": [54.2, 54.16, 54.11, 54.07, 54.03, 53.98, 53.94, 53.9, 53.86, 53.81, 53.77, 53.73, 53.68, 53.64, 53.6, 53.55, 53.51, 53.47, 53.42, 53.38, 53.34, 53.29, 53.25, 53.21, 53.17, 53.12, 53.08, 53.04, 52.99, 52.95],
+  "metrics": {
+    "backtest_horizon": 30,
+    "mae_model": 1.4999,
+    "mae_naive": 1.5,
+    "mape_model_pct": 2.76,
+    "beats_naive": true
+  },
+  "expect": {
+    "language": "de",
+    "verdict": "beats",
+    "disclaimer": "Bildungsanalyse — keine Anlageberatung.",
+    "max_words": 150
+  },
+  "covers": "hairline win: mae_model 1.4999 against 1.5; beats_naive true"
+}

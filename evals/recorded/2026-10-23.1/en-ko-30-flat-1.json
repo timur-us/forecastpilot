@@ -1,0 +1,12 @@
+{
+  "case_id": "en-ko-30-flat",
+  "sample": 1,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**1. Price movement**\nKO last closed at 69.41. The 30-trading-day forecast starts at 69.41 and ends at 69.41, so it projects no net change over the horizon.\n\n**2. Model quality**\nOver a 30-day backtest horizon, the model's mean absolute error (MAE) was 1.2088, against 1.105 for the naive baseline. The mean absolute percentage error (MAPE) was 1.73%. The model does not beat the naive baseline (beats_naive: False), so it adds no demonstrated accuracy over simply carrying the last price forward.\n\n**3. Interpretation**\nA flat forecast is not evidence that the price will stay unchanged. It means the model sees no reliable directional signal. Because the model underperformed the naive baseline in the backtest, it should be given little weight. The forecast says nothing about volatility, intermediate price swings, or external events.\n\n*Educational analysis — not investment advice.*",
+  "stop_reason": "end_turn",
+  "input_tokens": 458,
+  "output_tokens": 309,
+  "cost_usd": 0.004006,
+  "generated_at": "2026-10-23T18:48:29+00:00"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "de-sap-5-loses-4dec",
+  "ticker": "SAP.DE",
+  "language": "de",
+  "horizon": 5,
+  "last_close": 230.15,
+  "forecast": [229.8, 229.43, 229.05, 228.68, 228.3],
+  "metrics": {
+    "backtest_horizon": 5,
+    "mae_model": 6.8767,
+    "mae_naive": 6.37,
+    "mape_model_pct": 2.95,
+    "beats_naive": false
+  },
+  "expect": {
+    "language": "de",
+    "verdict": "does_not_beat",
+    "disclaimer": "Bildungsanalyse — keine Anlageberatung.",
+    "max_words": 150
+  },
+  "covers": "four-decimal metric (6.8767, the earlier README example); beats_naive false"
+}

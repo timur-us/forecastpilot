@@ -1,0 +1,12 @@
+{
+  "case_id": "de-mbg-30-narrow-win",
+  "sample": 3,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nMBG.DE schloss zuletzt bei 54.37. Die Prognose startet bei 54.20 und endet nach 30 Handelstagen bei 52.95, also unter dem letzten Schlusskurs.\n\n**Modellgüte**\nIm Backtest über 30 Tage beträgt der mittlere absolute Fehler (MAE) des Modells 1.4999, der der naiven Benchmark 1.5. Das Modell schlägt die naive Benchmark (beats_naive: True), allerdings nur minimal. Der MAPE liegt bei 2.76 %.\n\n**Einschränkung**\nDie Prognose deutet auf eine leicht rückläufige Tendenz hin, ist aber keine Gewissheit. Der Vorsprung gegenüber der naiven Methode ist sehr gering. Unvorhersehbare Ereignisse und Marktschocks sind im Modell nicht berücksichtigt.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 462,
+  "output_tokens": 832,
+  "cost_usd": 0.009244,
+  "generated_at": "2026-10-23T18:46:44+00:00"
+}

@@ -1,0 +1,18 @@
+{
+  "id": "de-xyz-30-no-backtest",
+  "ticker": "XYZ.DE",
+  "language": "de",
+  "horizon": 30,
+  "last_close": 15.42,
+  "forecast": [15.3, 15.28, 15.27, 15.25, 15.24, 15.22, 15.21, 15.19, 15.18, 15.16, 15.14, 15.13, 15.11, 15.1, 15.08, 15.07, 15.05, 15.04, 15.02, 15.01, 14.99, 14.97, 14.96, 14.94, 14.93, 14.91, 14.9, 14.88, 14.87, 14.85],
+  "metrics": {
+    "note": "series too short for backtest"
+  },
+  "expect": {
+    "language": "de",
+    "verdict": "no_backtest",
+    "disclaimer": "Bildungsanalyse — keine Anlageberatung.",
+    "max_words": 150
+  },
+  "covers": "no backtest: metrics carry only the note, as the API returns it"
+}

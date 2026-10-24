@@ -1,0 +1,12 @@
+{
+  "case_id": "de-at1-30-under-one",
+  "sample": 3,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung:** Der letzte Schlusskurs von AT1.DE liegt bei 0,84. Die Prognose startet bei 0,84 und endet nach 30 Handelstagen bei 0,79. Das Modell erwartet somit einen Rückgang.\n\n**Modellgüte:** Der Backtest über 30 Handelstage ergibt einen mittleren absoluten Fehler (MAE) von 0,0531 für das Modell, die naive Vergleichsprognose erreicht 0,0588. Der MAPE des Modells beträgt 6,32 %. Damit schlägt das Modell die naive Baseline (beats_naive: True), allerdings nur mit geringem Abstand.\n\n**Einschränkung / Interpretation:** Die Prognose ist eine statistische Fortschreibung historischer Muster, keine Gewissheit. Sie berücksichtigt keine unerwarteten Ereignisse, Unternehmensnachrichten oder Marktschocks. Der Backtest-Fehler zeigt, dass Abweichungen vom Prognosepfad realistisch sind.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 463,
+  "output_tokens": 401,
+  "cost_usd": 0.004936,
+  "generated_at": "2026-10-23T18:45:52+00:00"
+}

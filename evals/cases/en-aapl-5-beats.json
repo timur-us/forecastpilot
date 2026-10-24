@@ -1,0 +1,22 @@
+{
+  "id": "en-aapl-5-beats",
+  "ticker": "AAPL",
+  "language": "en",
+  "horizon": 5,
+  "last_close": 258.14,
+  "forecast": [258.4, 258.7, 259.01, 259.31, 259.62],
+  "metrics": {
+    "backtest_horizon": 5,
+    "mae_model": 2.1134,
+    "mae_naive": 2.4871,
+    "mape_model_pct": 0.81,
+    "beats_naive": true
+  },
+  "expect": {
+    "language": "en",
+    "verdict": "beats",
+    "disclaimer": "Educational analysis — not investment advice.",
+    "max_words": 150
+  },
+  "covers": "short horizon; beats_naive true"
+}

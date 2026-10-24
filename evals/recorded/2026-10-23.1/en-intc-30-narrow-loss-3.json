@@ -1,0 +1,12 @@
+{
+  "case_id": "en-intc-30-narrow-loss",
+  "sample": 3,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nINTC last closed at 37.62. The forecast starts at 37.70 and ends at 38.91 after 30 trading days, a modest upward drift from the last close.\n\n**Model quality**\nOver a 30-day backtest horizon, the model's MAE was 1.5001 versus 1.5 for the naive baseline. MAPE was 3.99%. beats_naive is False, so the model does not outperform the naive baseline.\n\n**Interpretation**\nThe forecast shows no demonstrated edge over simply assuming an unchanged price. It is a statistical projection, not a prediction of specific events, and actual prices may deviate materially. It should not be the sole basis for any decision.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 459,
+  "output_tokens": 615,
+  "cost_usd": 0.007068,
+  "generated_at": "2026-10-23T18:48:27+00:00"
+}

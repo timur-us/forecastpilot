@@ -1,0 +1,22 @@
+{
+  "id": "de-at1-30-under-one",
+  "ticker": "AT1.DE",
+  "language": "de",
+  "horizon": 30,
+  "last_close": 0.84,
+  "forecast": [0.84, 0.84, 0.84, 0.83, 0.83, 0.83, 0.83, 0.83, 0.83, 0.82, 0.82, 0.82, 0.82, 0.82, 0.82, 0.81, 0.81, 0.81, 0.81, 0.81, 0.81, 0.8, 0.8, 0.8, 0.8, 0.8, 0.8, 0.79, 0.79, 0.79],
+  "metrics": {
+    "backtest_horizon": 30,
+    "mae_model": 0.0531,
+    "mae_naive": 0.0588,
+    "mape_model_pct": 6.32,
+    "beats_naive": true
+  },
+  "expect": {
+    "language": "de",
+    "verdict": "beats",
+    "disclaimer": "Bildungsanalyse — keine Anlageberatung.",
+    "max_words": 150
+  },
+  "covers": "price below 1 with two decimals; beats_naive true"
+}

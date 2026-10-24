@@ -1,0 +1,22 @@
+{
+  "id": "de-ads-5-beats",
+  "ticker": "ADS.DE",
+  "language": "de",
+  "horizon": 5,
+  "last_close": 172.6,
+  "forecast": [172.9, 173.21, 173.53, 173.84, 174.15],
+  "metrics": {
+    "backtest_horizon": 5,
+    "mae_model": 2.331,
+    "mae_naive": 2.7084,
+    "mape_model_pct": 1.35,
+    "beats_naive": true
+  },
+  "expect": {
+    "language": "de",
+    "verdict": "beats",
+    "disclaimer": "Bildungsanalyse — keine Anlageberatung.",
+    "max_words": 150
+  },
+  "covers": "short horizon; beats_naive true"
+}

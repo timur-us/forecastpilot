@@ -1,0 +1,12 @@
+{
+  "case_id": "en-gspc-30-thousands",
+  "sample": 2,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nThe last close for ^GSPC was 5812.34. The forecast starts at 5818.90 and ends at 5905.12 after 30 trading days, implying a gradual upward drift from the last close.\n\n**Model quality**\nOver a 30-day backtest horizon, the model's mean absolute error (MAE) was 61.2278, compared with 68.9031 for the naive baseline. The model beats the naive baseline (beats_naive: True). Its mean absolute percentage error (MAPE) was 1.05%.\n\n**Interpretation**\nThe forecast is a statistical projection, not a certainty. Outperforming the naive baseline in one backtest does not guarantee future accuracy. The forecast does not account for unexpected events, and it does not indicate that the index will follow this path.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 466,
+  "output_tokens": 274,
+  "cost_usd": 0.003672,
+  "generated_at": "2026-10-23T18:48:11+00:00"
+}

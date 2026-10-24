@@ -1,0 +1,12 @@
+{
+  "case_id": "en-tsla-30-negative-drift",
+  "sample": 1,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**TSLA Commentary**\n\n**Price movement:** TSLA last closed at 438.52. The forecast starts at 436.90 and ends at 412.18 after 30 trading days, implying a decline from the starting level.\n\n**Model quality:** Over the 30-day backtest horizon, the model's MAE was 22.7316 (MAPE 5.08%), versus 19.485 for the naive baseline. beats_naive is False: the model did not outperform the naive baseline in the backtest.\n\n**Interpretation:** The projected decline to 412.18 should be treated with caution, since a simple naive forecast was more accurate historically. The forecast is a statistical extrapolation, not a prediction of specific events, and it does not capture news, earnings, or sudden market shifts. It is best used as one input among several.\n\n*Educational analysis — not investment advice.*",
+  "stop_reason": "end_turn",
+  "input_tokens": 460,
+  "output_tokens": 278,
+  "cost_usd": 0.0037,
+  "generated_at": "2026-10-23T18:49:14+00:00"
+}

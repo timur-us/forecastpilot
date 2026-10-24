@@ -1,0 +1,22 @@
+{
+  "id": "en-sndl-5-under-one",
+  "ticker": "SNDL",
+  "language": "en",
+  "horizon": 5,
+  "last_close": 0.73,
+  "forecast": [0.73, 0.72, 0.72, 0.71, 0.71],
+  "metrics": {
+    "backtest_horizon": 5,
+    "mae_model": 0.0412,
+    "mae_naive": 0.0457,
+    "mape_model_pct": 5.64,
+    "beats_naive": true
+  },
+  "expect": {
+    "language": "en",
+    "verdict": "beats",
+    "disclaimer": "Educational analysis — not investment advice.",
+    "max_words": 150
+  },
+  "covers": "price below 1 with two decimals; beats_naive true"
+}

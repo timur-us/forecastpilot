@@ -1,0 +1,12 @@
+{
+  "case_id": "en-amc-90-high-mape",
+  "sample": 2,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nAMC last closed at 3.21. The forecast starts at 3.18 and ends at 2.64 after 90 trading days, pointing to a decline over the horizon.\n\n**Model quality**\nIn the 90-day backtest, the model's MAE was 1.2347 against 0.9802 for the naive baseline, and its MAPE was 38.47%. beats_naive is False: the model did not beat the naive baseline.\n\n**Interpretation**\nBecause the model underperformed a simple naive forecast, the projected decline deserves low confidence. The forecast is a statistical extrapolation, not a prediction of specific events. It does not capture news, earnings, or other company-specific developments, and it should not be read as a reliable price target.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 460,
+  "output_tokens": 636,
+  "cost_usd": 0.00728,
+  "generated_at": "2026-10-23T18:48:01+00:00"
+}

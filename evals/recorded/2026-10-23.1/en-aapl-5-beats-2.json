@@ -1,0 +1,12 @@
+{
+  "case_id": "en-aapl-5-beats",
+  "sample": 2,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nAAPL last closed at 258.14. The 5-trading-day forecast starts at 258.40 and ends at 259.62, which is a modest rise from the forecast start.\n\n**Model quality**\nOver the 5-day backtest horizon, the model's MAE was 2.1134 versus 2.4871 for the naive baseline, and its MAPE was 0.81%. The model beats the naive baseline (beats_naive: True).\n\n**Interpretation**\nThe forecast suggests only a slight upward drift, and it is a statistical projection, not a certainty. Beating the naive baseline in the backtest does not guarantee future accuracy. The forecast does not account for news, earnings, or market shocks.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 461,
+  "output_tokens": 248,
+  "cost_usd": 0.003402,
+  "generated_at": "2026-10-23T18:47:45+00:00"
+}

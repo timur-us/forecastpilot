@@ -1,0 +1,22 @@
+{
+  "id": "de-dax-30-thousands",
+  "ticker": "^GDAXI",
+  "language": "de",
+  "horizon": 30,
+  "last_close": 18234.56,
+  "forecast": [18260.1, 18275.7, 18291.3, 18306.89, 18322.49, 18338.09, 18353.69, 18369.29, 18384.89, 18400.48, 18416.08, 18431.68, 18447.28, 18462.88, 18478.48, 18494.07, 18509.67, 18525.27, 18540.87, 18556.47, 18572.07, 18587.66, 18603.26, 18618.86, 18634.46, 18650.06, 18665.66, 18681.25, 18696.85, 18712.45],
+  "metrics": {
+    "backtest_horizon": 30,
+    "mae_model": 198.7731,
+    "mae_naive": 231.0412,
+    "mape_model_pct": 1.12,
+    "beats_naive": true
+  },
+  "expect": {
+    "language": "de",
+    "verdict": "beats",
+    "disclaimer": "Bildungsanalyse — keine Anlageberatung.",
+    "max_words": 150
+  },
+  "covers": "DAX level above 10,000 (thousands separator in German); beats_naive true"
+}

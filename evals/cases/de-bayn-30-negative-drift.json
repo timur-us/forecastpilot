@@ -1,0 +1,22 @@
+{
+  "id": "de-bayn-30-negative-drift",
+  "ticker": "BAYN.DE",
+  "language": "de",
+  "horizon": 30,
+  "last_close": 27.84,
+  "forecast": [27.6, 27.54, 27.48, 27.43, 27.37, 27.31, 27.25, 27.19, 27.14, 27.08, 27.02, 26.96, 26.9, 26.85, 26.79, 26.73, 26.67, 26.62, 26.56, 26.5, 26.44, 26.38, 26.33, 26.27, 26.21, 26.15, 26.09, 26.04, 25.98, 25.92],
+  "metrics": {
+    "backtest_horizon": 30,
+    "mae_model": 1.4537,
+    "mae_naive": 1.2012,
+    "mape_model_pct": 5.22,
+    "beats_naive": false
+  },
+  "expect": {
+    "language": "de",
+    "verdict": "does_not_beat",
+    "disclaimer": "Bildungsanalyse — keine Anlageberatung.",
+    "max_words": 150
+  },
+  "covers": "negative drift; beats_naive false"
+}

@@ -1,0 +1,22 @@
+{
+  "id": "en-nvda-30-beats",
+  "ticker": "NVDA",
+  "language": "en",
+  "horizon": 30,
+  "last_close": 221.97,
+  "forecast": [221.78, 221.94, 222.09, 222.25, 222.41, 222.57, 222.72, 222.88, 223.04, 223.2, 223.35, 223.51, 223.67, 223.82, 223.98, 224.14, 224.3, 224.45, 224.61, 224.77, 224.92, 225.08, 225.24, 225.4, 225.55, 225.71, 225.87, 226.03, 226.18, 226.34],
+  "metrics": {
+    "backtest_horizon": 30,
+    "mae_model": 6.1651,
+    "mae_naive": 6.4573,
+    "mape_model_pct": 2.77,
+    "beats_naive": true
+  },
+  "expect": {
+    "language": "en",
+    "verdict": "beats",
+    "disclaimer": "Educational analysis — not investment advice.",
+    "max_words": 150
+  },
+  "covers": "base case, figures of the README example; beats_naive true"
+}
