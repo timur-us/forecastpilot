@@ -18,6 +18,8 @@ updates:
         patterns: ["*"]
   # The base image in the Dockerfile. The first Trivy scan's findings came
   # from it (setuptools in python:3.11-slim), not from requirements.txt.
+  # FROM is pinned by digest, so a new build of the tag arrives as a PR that
+  # updates the digest.
   - package-ecosystem: docker
     directory: "/"
     schedule:
