@@ -75,6 +75,30 @@ jobs:
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - run: docker build -t forecastpilot:ci .
+      # The image starts and answers /health within 30 seconds (it runs
+      # without setuptools, which the Dockerfile removes). The key is a
+      # placeholder: /health needs none, and no LLM call is made.
+      - name: Smoke test
+        run: |
+          docker run -d --name smoke -p 127.0.0.1:8000:8000 \
+            -e ANTHROPIC_API_KEY=smoke-placeholder forecastpilot:ci > /dev/null
+          deadline=$((SECONDS + 30))
+          status=""
+          while [ "$SECONDS" -lt "$deadline" ]; do
+            status=$(curl -s -o /dev/null -w '%{http_code}' --max-time 2 http://127.0.0.1:8000/health || true)
+            [ "$status" = "200" ] && break
+            [ "$(docker inspect -f '{{.State.Running}}' smoke)" = "true" ] || break
+            sleep 1
+          done
+          if [ "$status" = "200" ]; then
+            echo "/health answered 200"
+            docker stop smoke > /dev/null
+            exit 0
+          fi
+          echo "::error::/health did not answer 200 within 30 seconds, or the container exited (last status: ${status:-none})"
+          docker logs smoke
+          docker stop smoke > /dev/null || true
+          exit 1
       # Trivy comes from its release tarball, checked against a committed
       # checksum, not from aquasecurity/trivy-action or setup-trivy: both had
       # their tags replaced with a credential stealer in March 2026

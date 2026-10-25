@@ -16,3 +16,12 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+  # The base image in the Dockerfile. The first Trivy scan's findings came
+  # from it (setuptools in python:3.11-slim), not from requirements.txt.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ["*"]
