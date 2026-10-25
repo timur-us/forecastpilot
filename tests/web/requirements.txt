@@ -1,0 +1,5 @@
+# Browser tests of the web app (tests/web/): Playwright + pytest, nothing from
+# app/. Kept apart from requirements-dev.txt so the main suite needs no browser.
+pytest==9.1.1
+pytest-playwright==0.10.0
+playwright==1.63.0

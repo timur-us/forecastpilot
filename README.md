@@ -233,6 +233,14 @@ Checks (the same ones CI runs):
 ruff check . && ruff format --check . && pytest -q
 ```
 
+Browser tests of the web app (headless Chromium against a mock API, screenshots in `tests/web/artifacts/`) use their own environment:
+
+```bash
+uv venv --python 3.11 .venv-web && uv pip install --python .venv-web -r tests/web/requirements.txt
+.venv-web/bin/python -m playwright install --only-shell chromium
+.venv-web/bin/python -m pytest tests/web -q
+```
+
 Runtime dependencies are pinned in `requirements.txt` to the versions running in production; `requirements-dev.txt` adds `pytest`, `httpx` and `ruff`. The tests run offline — market data and the Anthropic client are replaced by fakes.
 
 ## Docker
@@ -244,7 +252,7 @@ docker run --env-file .env -p 8000:8000 forecastpilot
 
 ## Deployment
 
-Every push to `main` and every pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff format --check` and `pytest` on Python 3.11, then a Docker build. On `main` a `changes` job diffs the push against the previous head and gates two deployments: when `app/`, `infra/`, `requirements.txt`, the `Dockerfile` or `.dockerignore` changed, the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az deployment group create` against `infra/main.bicep` (see [Infrastructure](#infrastructure); a new revision takes traffic once it is healthy, the previous one serves until then); when `web/` changed, the page is published to GitHub Pages. Documentation-only changes deploy nothing, and neither do changes to the workflow itself, which carries no deployed values; a manual run (`workflow_dispatch`) can redeploy either part.
+Every push to `main` and every pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff format --check` and `pytest` on Python 3.11, then a Docker build. Each of these runs also drives the web app in headless Chromium against a mock API (`web-test`) and uploads screenshots of every state as a CI artifact. On `main` a `changes` job diffs the push against the previous head and gates two deployments: when `app/`, `infra/`, `requirements.txt`, the `Dockerfile` or `.dockerignore` changed, the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az deployment group create` against `infra/main.bicep` (see [Infrastructure](#infrastructure); a new revision takes traffic once it is healthy, the previous one serves until then); when `web/` changed, the page is published to GitHub Pages. Documentation-only changes deploy nothing, and neither do changes to the workflow itself, which carries no deployed values; a manual run (`workflow_dispatch`) can redeploy either part.
 
 ## Infrastructure
 
