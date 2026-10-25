@@ -1,0 +1,12 @@
+{
+  "case_id": "en-amc-90-high-mape",
+  "sample": 3,
+  "prompt_version": "2026-10-25.2",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nAMC last closed at 3.21. The forecast starts at 3.18 and ends at 2.64 after 90 trading days.\n\n**Model quality**\nThe backtest over a 90-day horizon gave the model a MAE of 1.2347 and a MAPE of 38.47%. The naive baseline's MAE was 0.9802. The model does not beat the naive baseline.\n\n**Interpretation**\nThe forecast points to a lower price path over the period, but its backtest record is weaker than simply carrying the last price forward, so it deserves little weight. The error level is large relative to the share price, and the forecast does not capture news, sentiment shifts or sudden volatility. It should be treated as one scenario, not a prediction.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 811,
+  "output_tokens": 253,
+  "cost_usd": 0.004152,
+  "generated_at": "2026-10-25T05:48:38+00:00"
+}

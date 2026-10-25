@@ -76,8 +76,25 @@ SCORING_RULE = (
     "tuned to the golden set."
 )
 
+# Versions that were recorded, measured and not shipped. They stay in the
+# record so the regression stays visible; the gate and the Δ columns compare
+# accepted versions only.
+REJECTED_VERSIONS = {
+    "2026-10-25.1": (
+        "numbers_match fell from 20/20 to 16/20 golden cases (hold-out 6/6 to 3/6): "
+        "English replies computed the change between forecast end and last close, "
+        "a figure not in the data, and two replies restated part 1 after a visible "
+        "self-correction. Replaced by 2026-10-25.2 with one added rule for part 1."
+    ),
+}
+
 # Changes to the scorer, each with the sample that showed it measuring wrongly.
 SCORER_CHANGELOG = (
+    (
+        "2026-10-25",
+        "numbers_match (app.evals.check_numbers): an integer directly after an index name (S&P 500, Nasdaq 100, DAX 40) is the name, not a cited figure, and is no longer extracted.",
+        "en-gspc-30-thousands-1/2/3 under 2026-10-25.2 and -3 under 2026-10-25.1: 'The S&P 500 (^GSPC) last closed at 5,812.34.' failed with 'numbers not in the data: 500'.",
+    ),
     (
         "2026-10-24",
         "verdict: the English 'lags' in the subject-neutral negative list matched the German 'lag' (past tense of liegen); narrowed to 'lags behind'.",
@@ -119,6 +136,16 @@ LABELS = {
 
 # Points the prompt leaves open. The scorer never counts them as model
 # failures; where it can see them it records a hint with the gap's tag.
+# CLOSED_BY names the prompt version whose rules settle a gap; the report
+# marks it for versions from then on.
+CLOSED_BY = {
+    "G1": "2026-10-25.1",
+    "G2": "2026-10-25.1",
+    "G4": "2026-10-25.1",
+    "G6": "2026-10-25.1",
+    "G8": "2026-10-25.1",
+    "G12": "2026-10-25.1",
+}
 SPEC_GAPS = (
     (
         "G1",

@@ -1,0 +1,12 @@
+{
+  "case_id": "de-ifx-90-beats",
+  "sample": 3,
+  "prompt_version": "2026-10-25.2",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDie Infineon-Aktie (IFX.DE) schloss zuletzt bei 33,18. Die Prognose startet bei 33,40 und endet nach 90 Handelstagen bei 36,02.\n\n**Modellgüte**\nIm Backtest über 90 Handelstage erreichte das Modell einen mittleren absoluten Fehler (MAE) von 1,3875 und einen mittleren absoluten prozentualen Fehler (MAPE) von 3,98 Prozent. Die naive Baseline kam auf einen MAE von 1,6102. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDie Prognose beschreibt einen statistisch erwarteten Verlauf, keine gesicherte Entwicklung. Der Backtest bezieht sich auf einen vergangenen Zeitraum und garantiert keine ähnliche Genauigkeit in der Zukunft. Unvorhersehbare Ereignisse, Unternehmensnachrichten oder Marktschocks sind im Modell nicht abgebildet und können den Kurs deutlich abweichen lassen.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 814,
+  "output_tokens": 414,
+  "cost_usd": 0.005768,
+  "generated_at": "2026-10-25T07:43:56+00:00"
+}

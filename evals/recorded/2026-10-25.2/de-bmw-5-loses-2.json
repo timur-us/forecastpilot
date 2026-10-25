@@ -1,0 +1,12 @@
+{
+  "case_id": "de-bmw-5-loses",
+  "sample": 2,
+  "prompt_version": "2026-10-25.2",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer letzte Schlusskurs von BMW.DE lag bei 78,42. Die Prognose startet bei 78,30 und endet nach 5 Handelstagen bei 77,65.\n\n**Modellgüte**\nIm Backtest über 5 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 1,221, der mittlere absolute prozentuale Fehler (MAPE) bei 1,47 Prozent. Die naive Baseline erreichte einen MAE von 1,1534. Das Modell schlägt die naive Baseline nicht.\n\n**Einschränkung**\nDie Prognose deutet auf einen leicht nachgebenden Kursverlauf hin, ist aber nur eine statistische Fortschreibung. Da die naive Baseline im Backtest genauer war, sollte der Prognosepfad nur mit Vorsicht gewichtet werden. Sie berücksichtigt weder Nachrichten, Quartalszahlen noch Marktschocks und sagt nichts über Kursziele oder Handlungsempfehlungen aus.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 813,
+  "output_tokens": 404,
+  "cost_usd": 0.005666,
+  "generated_at": "2026-10-25T07:27:47+00:00"
+}

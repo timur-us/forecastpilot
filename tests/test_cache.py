@@ -229,13 +229,30 @@ def test_stored_block_carries_the_prompt_version_and_a_hit_keeps_it(monkeypatch)
 
 
 def test_set_drops_expired_entries():
-    stale_key = ("OLD", "en", 2, ("1.00", "1.00", "2.00"))
+    stale_key = ("OLD", "en", 2, ("1.00", "1.00", "2.00"), "v1")
     cache._store[stale_key] = ({"text": "old"}, time.time() - 1)
 
-    cache.set("AAPL", "en", 2, ("100.00", "100.00", "101.00"), {"text": "new"})
+    cache.set("AAPL", "en", 2, ("100.00", "100.00", "101.00"), "v1", {"text": "new"})
 
     assert stale_key not in cache._store
-    assert cache.get("AAPL", "en", 2, ("100.00", "100.00", "101.00")) == {"text": "new"}
+    assert cache.get("AAPL", "en", 2, ("100.00", "100.00", "101.00"), "v1") == {
+        "text": "new"
+    }
+
+
+def test_a_block_from_an_earlier_prompt_version_is_never_served(monkeypatch):
+    fake = _patched_client(monkeypatch)
+    monkeypatch.setattr(commentary, "PROMPT_VERSION", "2026-10-23.1")
+    first = _call()
+    assert first["cached"] is False and first["prompt_version"] == "2026-10-23.1"
+
+    monkeypatch.setattr(commentary, "PROMPT_VERSION", "2026-10-25.1")
+    second = _call()
+
+    assert second["cached"] is False
+    assert second["prompt_version"] == "2026-10-25.1"
+    assert fake.messages.calls == 2
+    assert _call()["cached"] is True  # the v2 block is served under v2
 
 
 def test_cache_disabled_always_misses(monkeypatch):

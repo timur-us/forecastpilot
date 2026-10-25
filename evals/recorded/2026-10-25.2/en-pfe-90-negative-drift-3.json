@@ -1,0 +1,12 @@
+{
+  "case_id": "en-pfe-90-negative-drift",
+  "sample": 3,
+  "prompt_version": "2026-10-25.2",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nPfizer (PFE) last closed at 24.86. The forecast starts at 24.70 and ends at 23.15 after 90 trading days.\n\n**Model quality**\nOver a 90-day backtest, the model's MAE was 1.1023 and its MAPE was 4.12%. The naive baseline's MAE was 0.9861. The model does not beat the naive baseline.\n\n**Interpretation**\nThe forecast points to a softer path over the horizon, but the model was less accurate than simply carrying the last price forward. The forecast should therefore be treated as a weak signal rather than a reliable prediction. It does not account for earnings, news, or sector events, and it gives no indication of the likelihood of any particular outcome.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 811,
+  "output_tokens": 256,
+  "cost_usd": 0.004182,
+  "generated_at": "2026-10-25T10:53:50+00:00"
+}

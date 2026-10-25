@@ -1,0 +1,12 @@
+{
+  "case_id": "de-mbg-30-narrow-win",
+  "sample": 2,
+  "prompt_version": "2026-10-25.2",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDie Aktie von MBG.DE schloss zuletzt bei 54,37. Die Prognose beginnt bei 54,20 und endet nach 30 Handelstagen bei 52,95.\n\n**Modellgüte**\nIm Backtest über 30 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 1,4999, der mittlere prozentuale Fehler (MAPE) bei 2,76 Prozent. Die naive Baseline erreichte einen MAE von 1,5. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDer Vorsprung gegenüber der Baseline ist minimal, die Modellgüte daher kaum besser als ein einfacher Fortschreibungsansatz. Die Prognose zeigt eine leicht rückläufige Tendenz, ist aber ein Modellpfad und keine Gewissheit. Unerwartete Ereignisse, Marktschwankungen oder Unternehmensnachrichten sind nicht abgebildet. Sie eignet sich als Orientierung, nicht als alleinige Entscheidungsgrundlage.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 813,
+  "output_tokens": 423,
+  "cost_usd": 0.005856,
+  "generated_at": "2026-10-25T05:47:13+00:00"
+}

@@ -179,3 +179,28 @@ def test_invented_ambiguous_number_still_fails_both_readings():
 
     assert result["unmatched"] == ["77,777"]
     assert result["passed"] is False
+
+
+def test_index_names_are_not_read_as_figures():
+    # "S&P 500" names the index; the guard used to read 500 as an invented
+    # number (en-gspc-30-thousands, all three samples under prompt 2026-10-25.2).
+    payload = {
+        "last_close": 5812.34,
+        "forecast": [5818.9, 5905.12],
+        "metrics": {},
+        "horizon_days": 2,
+    }
+
+    named = check_numbers("The S&P 500 (^GSPC) last closed at 5,812.34.", payload)
+    german = check_numbers(
+        "Der DAX 40 schloss bei 5.812,34; der Nasdaq 100 stieg.", payload
+    )
+    level_after_name = check_numbers("Der DAX 5.812,34 ist der Schlusskurs.", payload)
+    volume = check_numbers("Volume was 500 shares.", payload)
+
+    assert named["passed"] is True and named["numbers_checked"] == 1
+    assert german["passed"] is True and german["numbers_checked"] == 1
+    assert (
+        level_after_name["passed"] is True and level_after_name["numbers_checked"] == 1
+    )
+    assert volume["unmatched"] == ["500"]

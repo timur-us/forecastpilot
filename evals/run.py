@@ -33,9 +33,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from evals.score import (
+    CLOSED_BY,
     COMMUNICATION_METRICS,
     CORRECTNESS_METRICS,
     METRICS,
+    REJECTED_VERSIONS,
     SCORER_CHANGELOG,
     SCORING_RULE,
     SPEC_GAPS,
@@ -82,6 +84,11 @@ def recorded_versions() -> list:
     return sorted(
         (p.name for p in RECORDED_DIR.iterdir() if p.is_dir()), key=version_key
     )
+
+
+def accepted_versions() -> list:
+    """Recorded versions that were not rejected, oldest first."""
+    return [v for v in recorded_versions() if v not in REJECTED_VERSIONS]
 
 
 def load_samples(version: str) -> list:
@@ -246,6 +253,8 @@ def render_markdown(
         + f" · total cost {cost:.2f} USD · {per_commentary}"
     )
     out += ["", f"**Scoring rule.** {SCORING_RULE}"]
+    if version in REJECTED_VERSIONS:
+        out += ["", f"**Rejected.** {REJECTED_VERSIONS[version]}"]
     if previous:
         out.append(f"Δ columns compare case pass rates with prompt {previous[0]}.")
     out += [
@@ -319,7 +328,11 @@ def render_markdown(
     )
     out.append("")
     for tag, description in SPEC_GAPS:
-        out.append(f"- **{tag}** {description}")
+        closed = CLOSED_BY.get(tag)
+        if closed and version_key(version) >= version_key(closed):
+            out.append(f"- **{tag}** (closed by prompt {closed}) {description}")
+        else:
+            out.append(f"- **{tag}** {description}")
 
     recorded_ids = {s["case_id"] for s in samples}
     out += [
@@ -356,11 +369,11 @@ def build_report(version: str) -> tuple:
     """(markdown, summary) for one recorded prompt version."""
     cases = load_cases()
     samples, scored, summary = build_summary(version, cases)
-    versions = recorded_versions()
+    # Compare with the accepted version before this one.
+    earlier = [v for v in accepted_versions() if version_key(v) < version_key(version)]
     previous = None
-    if version in versions and versions.index(version) > 0:
-        prev = versions[versions.index(version) - 1]
-        previous = (prev, build_summary(prev, cases)[2])
+    if earlier:
+        previous = (earlier[-1], build_summary(earlier[-1], cases)[2])
     return render_markdown(version, samples, cases, scored, summary, previous), summary
 
 

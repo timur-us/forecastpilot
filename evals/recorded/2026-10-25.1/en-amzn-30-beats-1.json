@@ -1,0 +1,12 @@
+{
+  "case_id": "en-amzn-30-beats",
+  "sample": 1,
+  "prompt_version": "2026-10-25.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nAMZN last closed at 226.13. The forecast starts at 226.40 and ends at 231.88 after 30 trading days, which is 5.75 above the last close.\n\n**Model quality**\nThe 30-day backtest produced a MAE of 5.912 for the model against 6.2045 for the naive baseline. The model's MAPE was 2.41%. The model beats the naive baseline.\n\n**Interpretation**\nThe forecast points to a modest upward drift from the last close. The model's edge over the naive baseline is small, and the backtest error is of similar size to the projected gain. The forecast is therefore not a reliable signal. It does not account for earnings, macroeconomic events or other unexpected shocks.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 781,
+  "output_tokens": 250,
+  "cost_usd": 0.004062,
+  "generated_at": "2026-10-25T05:40:44+00:00"
+}

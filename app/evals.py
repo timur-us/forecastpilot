@@ -35,6 +35,14 @@ _NUMBER_RE = re.compile(
 # opens a sentence mid-paragraph.
 _HEADING_ORDINAL_RE = re.compile(r"(?m)^[ \t#*]*\d+\.[ \t]+")
 
+# An integer that is part of an index name ("S&P 500", "Nasdaq 100", "DAX 40")
+# names the index, it does not cite a figure. Only a bare integer directly
+# after the name is dropped; a level such as "DAX 18.234,56" is still a number.
+_INDEX_NAME_RE = re.compile(
+    r"\b(?:S&P|Nasdaq|Russell|FTSE|Nikkei|DAX|MDAX|SDAX|TecDAX|CAC|Euro Stoxx|Stoxx"
+    r"|TOPIX|SMI|Hang Seng|IBEX|AEX|OMX)\s+\d+(?![.,]?\d)"
+)
+
 _TOLERANCE = 0.01  # absolute; accounts for rounding as printed
 # Float arithmetic turns an exact one-step difference such as 1.01 vs 1.02
 # into 0.010000000000000009; the slack keeps it inside the tolerance.
@@ -91,6 +99,7 @@ def _parse_candidates(token: str) -> list[float]:
 
 def _extract_numbers(text: str) -> list[tuple[str, list[float]]]:
     text = _HEADING_ORDINAL_RE.sub("", text)
+    text = _INDEX_NAME_RE.sub(lambda m: m.group().rstrip("0123456789").rstrip(), text)
     found = []
     for match in _NUMBER_RE.finditer(text):
         candidates = _parse_candidates(match.group())

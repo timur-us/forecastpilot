@@ -1,0 +1,12 @@
+{
+  "case_id": "de-ads-5-beats",
+  "sample": 2,
+  "prompt_version": "2026-10-25.2",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer letzte Schlusskurs von ADS.DE lag bei 172,60. Die Prognose startet bei 172,90 und endet nach 5 Handelstagen bei 174,15.\n\n**Modellgüte**\nIm Backtest über 5 Handelstage erreichte das Modell einen MAE von 2,331 und einen MAPE von 1,35 Prozent. Die naive Baseline kam auf einen MAE von 2,7084. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDie Prognose beschreibt einen leicht höheren Kursverlauf über die kommenden fünf Handelstage. Sie ist jedoch keine Garantie: Der Backtest deckt nur einen kurzen Zeitraum ab, und der Fehler des Modells ist von ähnlicher Größenordnung wie die prognostizierte Bewegung. Unerwartete Nachrichten, Marktschwankungen oder Unternehmensereignisse sind darin nicht berücksichtigt. Die Werte eignen sich als Orientierung, nicht als alleinige Entscheidungsgrundlage.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 813,
+  "output_tokens": 419,
+  "cost_usd": 0.005816,
+  "generated_at": "2026-10-25T05:46:05+00:00"
+}
