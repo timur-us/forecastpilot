@@ -1,11 +1,12 @@
 """Offline tests for app.commentary — no network, no API keys."""
 
+import json
 import re
 from types import SimpleNamespace
 
 import pytest
 
-from app import commentary
+from app import cache, commentary
 
 
 def _text(text):
@@ -14,6 +15,17 @@ def _text(text):
 
 def _thinking(thinking="..."):
     return SimpleNamespace(type="thinking", thinking=thinking)
+
+
+def _json(price="Last close 100.00.", quality="MAE 1.0.", interpretation="One input."):
+    """A structured reply as the model returns it: the prose of the three parts."""
+    return json.dumps(
+        {
+            "price_movement": price,
+            "model_quality": quality,
+            "interpretation": interpretation,
+        }
+    )
 
 
 class _FakeMessages:
@@ -39,11 +51,20 @@ class _FakeClient:
 def _install_client(monkeypatch, content=None, stop_reason="end_turn"):
     """Install a fake Anthropic client that answers with the given blocks."""
     if content is None:
-        content = [_text("Fake commentary. Last close 100.00.")]
+        content = [_text(_json())]
     client = _FakeClient(content, stop_reason)
     monkeypatch.setattr(commentary, "Anthropic", lambda *a, **kw: client)
     monkeypatch.setenv("COMMENTARY_CACHE_ENABLED", "false")
     return client
+
+
+PAYLOAD = {
+    "ticker": "AAPL",
+    "last_close": 100.0,
+    "forecast": [100.0, 101.0],
+    "metrics": {"mae_model": 1.0},
+    "horizon_days": 2,
+}
 
 
 def _call():
@@ -86,18 +107,24 @@ def test_cost_usd_respects_env_pricing(monkeypatch):
     assert result["cost_usd"] == 0.05
 
 
-def test_request_uses_the_token_budget_with_room_for_thinking(monkeypatch):
+def test_request_uses_the_token_budget_and_the_output_schema(monkeypatch):
     client = _install_client(monkeypatch)
 
     _call()
 
-    assert client.messages.last_kwargs["max_tokens"] == commentary.MAX_TOKENS
+    sent = client.messages.last_kwargs
+    assert sent["max_tokens"] == commentary.MAX_TOKENS
     # Floor: ~450 text tokens (German) plus the ~300 thinking tokens observed
     # at the former 600 limit, with headroom.
     assert commentary.MAX_TOKENS >= 1024
+    assert sent["output_config"] == {
+        "format": {"type": "json_schema", "schema": commentary.OUTPUT_SCHEMA}
+    }
+    assert commentary.OUTPUT_SCHEMA["additionalProperties"] is False
+    assert commentary.OUTPUT_SCHEMA["required"] == list(commentary.SECTIONS)
 
 
-def test_complete_response_reports_stop_reason_and_is_not_truncated(monkeypatch):
+def test_complete_response_reports_stop_reason_and_is_never_truncated(monkeypatch):
     _install_client(monkeypatch)
 
     result = _call()
@@ -106,31 +133,35 @@ def test_complete_response_reports_stop_reason_and_is_not_truncated(monkeypatch)
     assert result["truncated"] is False
 
 
-def test_response_cut_at_the_budget_is_flagged_as_truncated(monkeypatch):
+def test_response_cut_at_the_budget_raises_instead_of_partial_text(monkeypatch):
     _install_client(
-        monkeypatch, [_text("Last close 100.00. The forecast")], "max_tokens"
+        monkeypatch, [_text('{"price_movement": "Last close 100.00')], "max_tokens"
     )
+    monkeypatch.setenv("COMMENTARY_CACHE_ENABLED", "true")
+    cache._store.clear()
 
-    result = _call()
+    with pytest.raises(commentary.CommentaryError, match="incomplete structured reply"):
+        _call()
 
-    assert result["truncated"] is True
-    assert result["stop_reason"] == "max_tokens"
-    assert result["eval"]["passed"] is True  # the numbers check stays a separate signal
+    assert cache._store == {}
 
 
 def test_refused_response_raises_instead_of_returning_partial_text(monkeypatch):
-    _install_client(monkeypatch, [_text("Partial")], "refusal")
+    _install_client(monkeypatch, [_text(_json())], "refusal")
 
     with pytest.raises(commentary.CommentaryError, match="refusal"):
         _call()
 
 
-def test_text_is_assembled_from_text_blocks_after_thinking(monkeypatch):
-    _install_client(monkeypatch, [_thinking(), _text("Visible "), _text("commentary.")])
+def test_json_is_assembled_from_text_blocks_after_thinking(monkeypatch):
+    first = '{"price_movement": "Visible '
+    rest = 'commentary.", "model_quality": "Q.", "interpretation": "I."}'
+    _install_client(monkeypatch, [_thinking(), _text(first), _text(rest)])
 
     result = _call()
 
-    assert result["text"] == "Visible commentary."
+    assert result["sections"]["price_movement"] == "Visible commentary."
+    assert result["text"].startswith("**Price movement**\nVisible commentary.")
 
 
 def test_response_without_text_block_raises_commentary_error(monkeypatch):
@@ -138,6 +169,31 @@ def test_response_without_text_block_raises_commentary_error(monkeypatch):
 
     with pytest.raises(commentary.CommentaryError, match="empty response"):
         _call()
+
+
+@pytest.mark.parametrize(
+    "reply, reason",
+    [
+        ("not json at all", "invalid structured reply: Expecting value"),
+        ('["a list"]', "invalid structured reply: not an object"),
+        ('{"price_movement": "P.", "model_quality": "Q."}', "missing interpretation"),
+        (
+            '{"price_movement": "P.", "model_quality": "  ", "interpretation": "I."}',
+            "missing model_quality",
+        ),
+    ],
+)
+def test_invalid_structured_replies_raise_and_are_never_cached(
+    monkeypatch, reply, reason
+):
+    _install_client(monkeypatch, [_text(reply)])
+    monkeypatch.setenv("COMMENTARY_CACHE_ENABLED", "true")
+    cache._store.clear()
+
+    with pytest.raises(commentary.CommentaryError, match=re.escape(reason)):
+        _call()
+
+    assert cache._store == {}
 
 
 def test_describe_llm_error_maps_commentary_error():
@@ -156,32 +212,71 @@ def test_commentary_block_carries_the_prompt_version(monkeypatch):
     assert re.fullmatch(r"\d{4}-\d{2}-\d{2}\.\d+", commentary.PROMPT_VERSION)
 
 
-def test_call_model_returns_the_raw_reply_and_sends_the_prompt(monkeypatch):
-    client = _install_client(monkeypatch, [_thinking(), _text("Raw text.")])
+def test_call_model_returns_the_rendered_reply_and_sends_the_prompt(monkeypatch):
+    client = _install_client(monkeypatch, [_thinking(), _text(_json("P.", "Q.", "I."))])
     monkeypatch.delenv("ANTHROPIC_MODEL", raising=False)
     payload = {
         "ticker": "sap.de",
         "last_close": 123.456,
         "forecast": [120.0, 121.5, 125.0],
-        "metrics": {"mae_model": 6.8767},
+        "metrics": {"mae_model": 6.8767, "mae_naive": 6.37, "beats_naive": False},
         "horizon_days": 3,
     }
 
     reply = commentary.call_model(payload, "de")
 
     assert reply == commentary.ModelReply(
-        text="Raw text.",
+        text=(
+            "**Kursbewegung**\nP.\n\n"
+            "**Modellgüte**\nQ. Das Modell schlägt die naive Baseline nicht.\n\n"
+            "**Einschränkung**\nI.\n\n"
+            "Bildungsanalyse — keine Anlageberatung."
+        ),
         stop_reason="end_turn",
         model="claude-sonnet-5-5",
         input_tokens=1000,
         output_tokens=2000,
+        sections={
+            "price_movement": "P.",
+            "model_quality": "Q.",
+            "interpretation": "I.",
+            "verdict": "Das Modell schlägt die naive Baseline nicht.",
+            "disclaimer": "Bildungsanalyse — keine Anlageberatung.",
+        },
     )
     sent = client.messages.last_kwargs
     assert sent["system"] == commentary.SYSTEM
-    assert sent["max_tokens"] == commentary.MAX_TOKENS
     assert sent["messages"] == [
         {"role": "user", "content": commentary.user_prompt(payload, "de")}
     ]
+
+
+@pytest.mark.parametrize(
+    "metrics, language, sentence",
+    [
+        ({"beats_naive": True}, "en", "The model beats the naive baseline."),
+        ({"beats_naive": False}, "en", "The model does not beat the naive baseline."),
+        ({"note": "series too short for backtest"}, "en", "No backtest was possible."),
+        ({"beats_naive": True}, "de", "Das Modell schlägt die naive Baseline."),
+        (
+            {"note": "series too short for backtest"},
+            "de",
+            "Ein Backtest war nicht möglich.",
+        ),
+    ],
+)
+def test_verdict_sentence_comes_from_the_data_not_the_model(
+    monkeypatch, metrics, language, sentence
+):
+    _install_client(monkeypatch, [_text(_json("P.", "Q.", "I."))])
+    payload = {**PAYLOAD, "metrics": metrics}
+
+    reply = commentary.call_model(payload, language)
+
+    assert reply.sections["verdict"] == sentence
+    assert f"\nQ. {sentence}\n" in reply.text
+    assert reply.text.endswith(commentary.DISCLAIMERS[language])
+    assert reply.text.startswith(f"**{commentary.LABELS[language][0]}**\n")
 
 
 def test_user_prompt_names_the_language_and_prints_two_decimals():
@@ -208,20 +303,13 @@ def test_user_prompt_names_the_language_and_prints_two_decimals():
 
 
 def test_call_model_raises_on_refusal_and_on_missing_text(monkeypatch):
-    payload = {
-        "ticker": "AAPL",
-        "last_close": 100.0,
-        "forecast": [100.0, 101.0],
-        "metrics": {},
-        "horizon_days": 2,
-    }
     _install_client(monkeypatch, [_text("Partial")], "refusal")
     with pytest.raises(commentary.CommentaryError, match="refusal"):
-        commentary.call_model(payload, "en")
+        commentary.call_model(PAYLOAD, "en")
 
     _install_client(monkeypatch, [_thinking()], "end_turn")
     with pytest.raises(commentary.CommentaryError, match="stop_reason=end_turn"):
-        commentary.call_model(payload, "en")
+        commentary.call_model(PAYLOAD, "en")
 
 
 def test_cost_usd_helper_applies_env_prices_and_rounds_to_six_decimals(monkeypatch):

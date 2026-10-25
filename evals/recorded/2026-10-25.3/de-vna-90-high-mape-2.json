@@ -1,0 +1,12 @@
+{
+  "case_id": "de-vna-90-high-mape",
+  "sample": 2,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer letzte Schlusskurs von VNA.DE lag bei 27,05. Die Prognose startet bei 26,80 und endet nach 90 Handelstagen bei 22,15.\n\n**Modellgüte**\nIm Backtest über 90 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 11,15, der mittlere prozentuale Fehler (MAPE) bei 41,2 Prozent. Der MAE der naiven Vergleichsprognose betrug 9,88. Das Modell schlägt die naive Baseline nicht.\n\n**Einschränkung**\nDie Prognose zeigt eine mögliche Richtung, ist aber angesichts der hohen Backtest-Fehler nur mit großer Vorsicht zu verwenden. Sie liefert keine verlässliche Kurszusage und berücksichtigt keine unvorhersehbaren Ereignisse. Für Entscheidungen sollte sie nur ergänzend herangezogen werden.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 879,
+  "output_tokens": 327,
+  "cost_usd": 0.005028,
+  "generated_at": "2026-10-25T12:28:26+00:00"
+}

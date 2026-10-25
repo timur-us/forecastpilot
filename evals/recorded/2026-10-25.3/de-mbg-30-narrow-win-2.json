@@ -1,0 +1,12 @@
+{
+  "case_id": "de-mbg-30-narrow-win",
+  "sample": 2,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer letzte Schlusskurs von MBG.DE liegt bei 54,37. Die Prognose beginnt bei 54,20 und endet nach 30 Handelstagen bei 52,95.\n\n**Modellgüte**\nIm Backtest über 30 Handelstage erreichte das Modell einen MAE von 1,4999 und einen MAPE von 2,76 Prozent. Der MAE der naiven Vergleichsprognose lag bei 1,50. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDie Prognose zeigt eine mögliche Kursrichtung, ist aber keine sichere Vorhersage. Der geringe Abstand zur naiven Prognose spricht für begrenzten Mehrwert. Unerwartete Ereignisse, Unternehmensnachrichten oder Marktschwankungen sind nicht abgebildet und können den Verlauf deutlich verändern.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 879,
+  "output_tokens": 306,
+  "cost_usd": 0.004818,
+  "generated_at": "2026-10-25T12:27:49+00:00"
+}

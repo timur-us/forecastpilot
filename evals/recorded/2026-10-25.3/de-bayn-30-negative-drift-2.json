@@ -1,0 +1,12 @@
+{
+  "case_id": "de-bayn-30-negative-drift",
+  "sample": 2,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer letzte Schlusskurs der Bayer-Aktie (BAYN.DE) lag bei 27,84. Die Prognose beginnt bei 27,60 und endet nach 30 Handelstagen bei 25,92.\n\n**Modellgüte**\nIm Backtest über 30 Handelstage erreichte das Modell einen mittleren absoluten Fehler (MAE) von 1,4537 und einen mittleren absoluten prozentualen Fehler (MAPE) von 5,22 Prozent. Der MAE der naiven Vergleichsprognose lag bei 1,2012. Das Modell schlägt die naive Baseline nicht.\n\n**Einschränkung**\nDie Prognose zeigt eine mögliche Richtung, ist aber keine sichere Vorhersage. Wegen der begrenzten Genauigkeit im Backtest sollte sie nur als einer von mehreren Anhaltspunkten dienen. Unerwartete Nachrichten oder Marktbewegungen sind nicht abgebildet.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 881,
+  "output_tokens": 337,
+  "cost_usd": 0.005132,
+  "generated_at": "2026-10-25T12:27:07+00:00"
+}

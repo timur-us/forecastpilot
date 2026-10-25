@@ -1,5 +1,6 @@
 """Offline tests for the commentary cache — no network, no API keys."""
 
+import json
 import time
 from datetime import datetime, timezone
 from types import SimpleNamespace
@@ -29,7 +30,14 @@ class _CountingMessages:
 
     def create(self, **kwargs):
         self.calls += 1
-        text = self.text or f"Commentary #{self.calls}."
+        # A structured reply: the prose of the three parts as JSON fields.
+        text = json.dumps(
+            {
+                "price_movement": "Price.",
+                "model_quality": self.text or f"Commentary #{self.calls}.",
+                "interpretation": "Interpretation.",
+            }
+        )
         stop_reason = self.stop_reasons[min(self.calls, len(self.stop_reasons)) - 1]
         return SimpleNamespace(
             content=[SimpleNamespace(type="text", text=text)],
@@ -162,32 +170,28 @@ def test_hit_re_evaluates_numbers_against_current_metrics(monkeypatch):
     assert second["eval"]["unmatched"] == ["1.0000"]
 
 
-def test_truncated_response_is_returned_flagged_but_never_cached(monkeypatch):
-    fake = _patched_client(
-        monkeypatch, text="Last close 100.00. The", stop_reason="max_tokens"
-    )
+def test_reply_cut_at_the_budget_raises_and_is_never_cached(monkeypatch):
+    fake = _patched_client(monkeypatch, stop_reason="max_tokens")
 
-    first = _call()
-    second = _call()
+    for _ in range(2):
+        with pytest.raises(commentary.CommentaryError, match="incomplete structured"):
+            _call()
 
-    assert first["truncated"] is True
-    assert first["stop_reason"] == "max_tokens"
-    assert first["cached"] is False
-    assert second["cached"] is False
     assert fake.messages.calls == 2
     assert cache._store == {}
 
 
-def test_after_a_truncated_reply_the_next_complete_one_is_cached(monkeypatch):
+def test_after_a_cut_reply_the_next_complete_one_is_cached(monkeypatch):
     fake = _patched_client(monkeypatch, stop_reason=["max_tokens", "end_turn"])
 
-    first = _call()
+    with pytest.raises(commentary.CommentaryError):
+        _call()
     second = _call()
     third = _call()
 
-    assert first["truncated"] is True and first["cached"] is False
     assert second["truncated"] is False and second["cached"] is False
     assert third["cached"] is True
+    assert third["sections"] == second["sections"]
     assert fake.messages.calls == 2
 
 

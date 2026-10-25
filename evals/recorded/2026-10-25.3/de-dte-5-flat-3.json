@@ -1,0 +1,12 @@
+{
+  "case_id": "de-dte-5-flat",
+  "sample": 3,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer letzte Schlusskurs von DTE.DE liegt bei 29,17. Die Prognose startet bei 29,17 und endet nach 5 Handelstagen ebenfalls bei 29,17.\n\n**Modellgüte**\nIm Backtest über 5 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 0,3815, der mittlere prozentuale Fehler (MAPE) bei 1,31 Prozent. Die naive Vergleichsprognose erreichte einen MAE von 0,354. Das Modell schlägt die naive Baseline nicht.\n\n**Einschränkung**\nDie Prognose deutet auf eine weitgehend seitwärts gerichtete Entwicklung hin, nicht auf einen erwarteten Kursanstieg oder -rückgang. Sie ist keine Garantie, und Kursschwankungen innerhalb der Woche sind weiterhin möglich. Wegen der begrenzten Backtest-Genauigkeit sollte sie nur als ein Hinweis unter mehreren gelten.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 879,
+  "output_tokens": 354,
+  "cost_usd": 0.005298,
+  "generated_at": "2026-10-25T12:27:42+00:00"
+}

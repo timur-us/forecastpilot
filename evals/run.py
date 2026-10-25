@@ -33,6 +33,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from evals.score import (
+    BY_CONSTRUCTION,
     CLOSED_BY,
     COMMUNICATION_METRICS,
     CORRECTNESS_METRICS,
@@ -278,9 +279,13 @@ def render_markdown(
             header += " Δ cases |"
             rule += " --- |"
         out += [header, rule]
+        constructed = BY_CONSTRUCTION.get(version, {})
         for metric, m in table.items():
+            group = _group(metric)
+            if metric in constructed:
+                group += " (by construction)"
             row = (
-                f"| {metric} | {_group(metric)} | {_pct(m['samples_passed'], m['samples'])} | "
+                f"| {metric} | {group} | {_pct(m['samples_passed'], m['samples'])} | "
                 f"{_pct(m['cases_passed'], m['cases'])} | "
                 f"{_pct(m['complete_passed'], m['complete'])} | "
                 f"{', '.join(m['unstable']) or '—'} |"
@@ -290,6 +295,13 @@ def render_markdown(
                 delta = m["cases_passed"] - before
                 row += f" {delta:+d} |"
             out.append(row)
+        if constructed:
+            out += [
+                "",
+                "By construction, not model performance: "
+                + "; ".join(f"{metric}: {why}" for metric, why in constructed.items())
+                + ".",
+            ]
 
     out += ["", "## Failures", ""]
     if summary["failures"]:

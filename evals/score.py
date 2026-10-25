@@ -76,6 +76,18 @@ SCORING_RULE = (
     "tuned to the golden set."
 )
 
+# Metrics a prompt version satisfies by construction: the code renders the
+# part, the model cannot get it wrong. The report marks them so they are not
+# read as model performance.
+BY_CONSTRUCTION = {
+    "2026-10-25.3": {
+        "label_format": "labels rendered by code",
+        "no_title_line": "rendered by code",
+        "structure": "labels, order and disclaimer rendered by code",
+        "verdict": "verdict sentence rendered by code; a contradicting prose sentence still fails",
+    },
+}
+
 # Versions that were recorded, measured and not shipped. They stay in the
 # record so the regression stays visible; the gate and the Δ columns compare
 # accepted versions only.

@@ -1,5 +1,6 @@
 """LLM commentary layer — Claude via the Anthropic API, with token tracking."""
 
+import json
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -41,45 +42,85 @@ def describe_llm_error(exc: Exception) -> str:
 # turn built by user_prompt. A date plus a counter; bump it with every edit
 # to either text so recorded evaluation results stay attributable to one
 # prompt. 2026-10-23.1 was the first label (text unchanged since 2026-08-09,
-# d3e40aa); 2026-10-25.1 added the rules below (labels, verdict sentences,
-# number format, no code, no title line) and was rejected: English replies
-# computed the change against the last close. 2026-10-25.2 adds one rule
-# for part 1: name the three figures, compute nothing.
-PROMPT_VERSION = "2026-10-25.2"
+# d3e40aa); 2026-10-25.1 added rules (labels, verdict sentences, number
+# format, no code, no title line) and was rejected: English replies computed
+# the change against the last close; 2026-10-25.2 added one rule for part 1
+# (name the three figures, compute nothing). 2026-10-25.3 switches the model
+# step to structured outputs: the model returns the prose of the three parts
+# as JSON fields, the code renders labels, verdict sentence and disclaimer.
+PROMPT_VERSION = "2026-10-25.3"
+
+# What the code renders around the model's prose, per language — the exact
+# wording prompt 2026-10-25.2 prescribed, now guaranteed by construction.
+LABELS = {
+    "en": ("Price movement", "Model quality", "Interpretation"),
+    "de": ("Kursbewegung", "Modellgüte", "Einschränkung"),
+}
+VERDICTS = {
+    "en": {
+        "beats": "The model beats the naive baseline.",
+        "does_not_beat": "The model does not beat the naive baseline.",
+        "no_backtest": "No backtest was possible.",
+    },
+    "de": {
+        "beats": "Das Modell schlägt die naive Baseline.",
+        "does_not_beat": "Das Modell schlägt die naive Baseline nicht.",
+        "no_backtest": "Ein Backtest war nicht möglich.",
+    },
+}
+DISCLAIMERS = {
+    "en": "Educational analysis — not investment advice.",
+    "de": "Bildungsanalyse — keine Anlageberatung.",
+}
+SECTIONS = ("price_movement", "model_quality", "interpretation")
+
+# The model delivers only what needs a model: the prose of the three parts.
+# Structured outputs (output_config.format, platform.claude.com/docs/en/
+# build-with-claude/structured-outputs) constrain the reply to this schema;
+# the grammar does not touch thinking, which stays on.
+OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "price_movement": {
+            "type": "string",
+            "description": "Part 1: the last close, the forecast start and the forecast end.",
+        },
+        "model_quality": {
+            "type": "string",
+            "description": "Part 2: the backtest accuracy, without the verdict sentence.",
+        },
+        "interpretation": {
+            "type": "string",
+            "description": "Part 3: what the forecast does and does not imply.",
+        },
+    },
+    "required": list(SECTIONS),
+    "additionalProperties": False,
+}
 
 SYSTEM = (
     "You are a markets analyst writing short, factual commentary for a management "
     "audience.\n"
-    "Structure: exactly three parts in this order, nothing before the first label "
-    "and nothing after the disclaimer. Each label is a line of its own in bold, "
-    "exactly as given, without numbering or colon:\n"
-    "English: **Price movement**, **Model quality**, **Interpretation**\n"
-    "German: **Kursbewegung**, **Modellgüte**, **Einschränkung**\n"
-    "Price movement: name the last close, the forecast start and the forecast "
+    "Return the three parts of the commentary as the fields price_movement, "
+    "model_quality and interpretation. The labels, the verdict on the naive "
+    "baseline and the disclaimer are added by the system: do not include them.\n"
+    "price_movement: name the last close, the forecast start and the forecast "
     "end. Do not compute differences, changes or percentages; cite only figures "
     "given in the data.\n"
-    "Model quality: the backtest accuracy, then the verdict as exactly one of "
-    "these sentences:\n"
-    "English: 'The model beats the naive baseline.' / 'The model does not beat "
-    "the naive baseline.' / 'No backtest was possible.'\n"
-    "German: 'Das Modell schlägt die naive Baseline.' / 'Das Modell schlägt die "
-    "naive Baseline nicht.' / 'Ein Backtest war nicht möglich.'\n"
-    "Use the first when beats_naive is true, the second when it is false, the "
-    "third when the data has no beats_naive; then cite no error figures and do "
-    "not guess.\n"
-    "Interpretation: what the forecast does and does not imply.\n"
+    "model_quality: the backtest accuracy from the given metrics. If the data "
+    "has no beats_naive there was no backtest: cite no error figures and do not "
+    "guess.\n"
+    "interpretation: what the forecast does and does not imply.\n"
     "Hard rule: use ONLY numbers that appear in the data given to you. Never "
     "invent, estimate, or round to a figure that isn't given. Write numbers in "
     "the conventions of the requested language: German with a decimal comma and "
     "a point as thousands separator (18.234,56; 6,88), English with a decimal "
     "point and a comma as thousands separator (18,234.56; 6.88).\n"
-    "Write the entire commentary, labels included, in the requested language; do "
-    "not mix languages. Write plain prose for people: do not quote field names "
-    "or code from the data (no beats_naive, no True or False, no mae_model); "
-    "say MAE, MAPE and backtest in words.\n"
-    "Maximum 150 words total. The last line is the disclaimer in the requested "
-    "language: 'Educational analysis — not investment advice.' in English, or "
-    "'Bildungsanalyse — keine Anlageberatung.' in German."
+    "Write every field in the requested language; do not mix languages. Write "
+    "plain prose for people: do not quote field names or code from the data (no "
+    "beats_naive, no True or False, no mae_model); say MAE, MAPE and backtest in "
+    "words.\n"
+    "Maximum 130 words across the three fields."
 )
 
 
@@ -105,6 +146,9 @@ class ModelReply:
     model: str
     input_tokens: int
     output_tokens: int
+    sections: dict | None = (
+        None  # the model's prose plus the rendered verdict and disclaimer
+    )
 
 
 def _fingerprint(last_close: float, forecast: list) -> tuple[str, str, str]:
@@ -126,13 +170,52 @@ def user_prompt(payload: dict, language: str) -> str:
     )
 
 
+def verdict_key(metrics: dict) -> str:
+    """Which verdict sentence the data supports."""
+    if "beats_naive" not in metrics:
+        return "no_backtest"
+    return "beats" if metrics["beats_naive"] else "does_not_beat"
+
+
+def render(sections: dict, language: str, verdict: str) -> str:
+    """The commentary text: labels, the model's prose, the verdict, the disclaimer."""
+    labels = LABELS[language]
+    return "\n\n".join(
+        [
+            f"**{labels[0]}**\n{sections['price_movement']}",
+            f"**{labels[1]}**\n{sections['model_quality']} {VERDICTS[language][verdict]}",
+            f"**{labels[2]}**\n{sections['interpretation']}",
+            DISCLAIMERS[language],
+        ]
+    )
+
+
+def _parse_sections(text: str) -> dict:
+    """The three prose fields of a structured reply, or CommentaryError."""
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise CommentaryError(f"invalid structured reply: {exc.msg}") from exc
+    if not isinstance(data, dict):
+        raise CommentaryError("invalid structured reply: not an object")
+    sections = {}
+    for key in SECTIONS:
+        value = data.get(key)
+        if not isinstance(value, str) or not value.strip():
+            raise CommentaryError(f"invalid structured reply: missing {key}")
+        sections[key] = value.strip()
+    return sections
+
+
 def call_model(payload: dict, language: str) -> ModelReply:
-    """One model call: build the prompt, send it, pull the text out of the reply.
+    """One model call: build the prompt, send it, render the structured reply.
 
     `payload` carries ticker, last_close, forecast, metrics and horizon_days —
-    the same dict the numbers check reads. Raises CommentaryError when the
-    reply is a refusal or holds no text; a reply cut off at MAX_TOKENS is
-    returned with stop_reason "max_tokens" for the caller to flag.
+    the same dict the numbers check reads. The reply is constrained to
+    OUTPUT_SCHEMA; the text of the ModelReply is the rendered commentary.
+    Raises CommentaryError when the reply is a refusal, is cut off at
+    MAX_TOKENS, holds no text, or is not valid JSON with the three fields —
+    there is no partial commentary any more.
     """
     client = Anthropic()  # reads ANTHROPIC_API_KEY from the environment
     model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
@@ -142,9 +225,10 @@ def call_model(payload: dict, language: str) -> ModelReply:
         max_tokens=MAX_TOKENS,
         system=SYSTEM,
         messages=[{"role": "user", "content": user_prompt(payload, language)}],
+        output_config={"format": {"type": "json_schema", "schema": OUTPUT_SCHEMA}},
     )
 
-    # Responses may interleave thinking blocks with text; the commentary is the
+    # Responses may interleave thinking blocks with text; the JSON is the
     # concatenation of all text blocks.
     text = "".join(
         block.text for block in msg.content if getattr(block, "type", None) == "text"
@@ -152,14 +236,23 @@ def call_model(payload: dict, language: str) -> ModelReply:
     if msg.stop_reason == "refusal":
         # Partial output of a refused request is incomplete by definition.
         raise CommentaryError("refusal")
+    if msg.stop_reason == "max_tokens":
+        raise CommentaryError("incomplete structured reply (stop_reason=max_tokens)")
     if not text:
         raise CommentaryError(f"empty response (stop_reason={msg.stop_reason})")
+    sections = _parse_sections(text)
+    verdict = verdict_key(payload["metrics"])
     return ModelReply(
-        text=text,
+        text=render(sections, language, verdict),
         stop_reason=msg.stop_reason,
         model=model,
         input_tokens=msg.usage.input_tokens,
         output_tokens=msg.usage.output_tokens,
+        sections={
+            **sections,
+            "verdict": VERDICTS[language][verdict],
+            "disclaimer": DISCLAIMERS[language],
+        },
     )
 
 
@@ -208,12 +301,12 @@ def generate_commentary(
 
     reply = call_model(payload, language)
 
-    # A reply cut off at the token budget is returned as is and flagged. Only
-    # complete replies (end_turn) enter the cache, so the next request tries
-    # again instead of repeating a partial text until midnight.
-    truncated = reply.stop_reason == "max_tokens"
+    # A reply cut off at the token budget raises in call_model (502, never
+    # cached): with structured outputs there is no partial text to return.
+    # `truncated` stays in the block for compatibility and is always false.
     result = {
         "text": reply.text,
+        "sections": reply.sections,
         "model": reply.model,
         "prompt_version": PROMPT_VERSION,
         "input_tokens": reply.input_tokens,
@@ -221,7 +314,7 @@ def generate_commentary(
         "cost_usd": cost_usd(reply.input_tokens, reply.output_tokens),
         "eval": check_numbers(reply.text, payload),
         "stop_reason": reply.stop_reason,
-        "truncated": truncated,
+        "truncated": False,
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     if reply.stop_reason == "end_turn":

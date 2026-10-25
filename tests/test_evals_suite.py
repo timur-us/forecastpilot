@@ -687,6 +687,8 @@ def test_recorded_baseline_scores_and_the_report_builds():
             assert summary["sets"]["golden"][metric]["cases"] == len(CASES)
             assert summary["sets"]["holdout"][metric]["cases"] == len(HOLDOUT)
         assert "## Scorer changes" in markdown
+        for metric in score.BY_CONSTRUCTION.get(version, {}):
+            assert f"| {metric} | {run._group(metric)} (by construction) |" in markdown
         assert "## Spec gaps" in markdown and "- **G12**" in markdown
         assert run.render_table(summary).startswith("[golden]")
 

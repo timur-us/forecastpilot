@@ -1,0 +1,12 @@
+{
+  "case_id": "de-ads-5-beats",
+  "sample": 2,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDie Aktie von adidas (ADS.DE) schloss zuletzt bei 172,60. Die Prognose beginnt bei 172,90 und endet nach 5 Handelstagen bei 174,15.\n\n**Modellgüte**\nIm Backtest über 5 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 2,331, der mittlere prozentuale Fehler (MAPE) bei 1,35 Prozent. Der MAE der naiven Vergleichsprognose betrug 2,7084. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDie Prognose deutet auf eine leicht steigende Tendenz über den kurzen Zeitraum hin. Sie ist jedoch keine Garantie: Unerwartete Nachrichten oder Marktbewegungen können den Kurs deutlich abweichen lassen, und die Fehlergrößen aus dem Backtest zeigen, dass Abweichungen normal sind.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 879,
+  "output_tokens": 331,
+  "cost_usd": 0.005068,
+  "generated_at": "2026-10-25T12:26:43+00:00"
+}

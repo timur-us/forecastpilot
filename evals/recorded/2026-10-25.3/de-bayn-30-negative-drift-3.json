@@ -1,0 +1,12 @@
+{
+  "case_id": "de-bayn-30-negative-drift",
+  "sample": 3,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer letzte Schlusskurs von BAYN.DE liegt bei 27,84. Die Prognose startet bei 27,60 und endet nach 30 Handelstagen bei 25,92.\n\n**Modellgüte**\nIm Backtest über 30 Handelstage erreichte das Modell einen MAE von 1,4537 und einen MAPE von 5,22 Prozent. Die naive Vergleichsprognose kam auf einen MAE von 1,2012. Das Modell schlägt die naive Baseline nicht.\n\n**Einschränkung**\nDie Prognose zeigt eine mögliche Tendenz, ist aber kein verlässliches Signal. Sie berücksichtigt weder unerwartete Nachrichten noch Marktschocks oder Unternehmensereignisse. Angesichts der Fehlergrößen im Backtest sollte sie nur als grobe Orientierung dienen, nicht als Grundlage für Anlageentscheidungen.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 881,
+  "output_tokens": 314,
+  "cost_usd": 0.004902,
+  "generated_at": "2026-10-25T12:27:10+00:00"
+}

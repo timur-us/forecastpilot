@@ -1,0 +1,12 @@
+{
+  "case_id": "de-sie-90-beats",
+  "sample": 1,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nSiemens (SIE.DE) schloss zuletzt bei 186,42. Die Prognose beginnt bei 186,90 und endet nach 90 Handelstagen bei 197,35.\n\n**Modellgüte**\nIm Backtest über 90 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 5,8842, der mittlere prozentuale Fehler (MAPE) bei 3,16 Prozent. Die naive Vergleichsprognose erreichte einen MAE von 6,9215. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDie Prognose beschreibt einen möglichen Kursverlauf auf Basis historischer Muster. Sie garantiert keine Kursentwicklung und berücksichtigt keine unerwarteten Nachrichten, Marktschocks oder Unternehmensereignisse. Als alleinige Entscheidungsgrundlage ist sie nicht geeignet, sondern nur als ein Baustein neben fundamentaler Analyse und Risikobetrachtung.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 880,
+  "output_tokens": 357,
+  "cost_usd": 0.00533,
+  "generated_at": "2026-10-25T12:28:07+00:00"
+}
