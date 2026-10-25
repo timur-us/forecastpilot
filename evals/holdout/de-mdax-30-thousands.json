@@ -1,0 +1,22 @@
+{
+  "id": "de-mdax-30-thousands",
+  "ticker": "^MDAXI",
+  "language": "de",
+  "horizon": 30,
+  "last_close": 26412.78,
+  "forecast": [26450.3, 26468.57, 26486.84, 26505.11, 26523.38, 26541.65, 26559.92, 26578.19, 26596.47, 26614.74, 26633.01, 26651.28, 26669.55, 26687.82, 26706.09, 26724.36, 26742.63, 26760.9, 26779.17, 26797.44, 26815.71, 26833.98, 26852.26, 26870.53, 26888.8, 26907.07, 26925.34, 26943.61, 26961.88, 26980.15],
+  "metrics": {
+    "backtest_horizon": 30,
+    "mae_model": 312.4471,
+    "mae_naive": 355.0192,
+    "mape_model_pct": 1.19,
+    "beats_naive": true
+  },
+  "expect": {
+    "language": "de",
+    "verdict": "beats",
+    "disclaimer": "Bildungsanalyse — keine Anlageberatung.",
+    "max_words": 150
+  },
+  "covers": "hold-out: index level above 10,000 in German, beats_naive true"
+}

@@ -1,0 +1,12 @@
+{
+  "case_id": "en-abcd-5-no-backtest",
+  "sample": 1,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nABCD last closed at 12.34. The forecast starts at 12.40 and ends at 12.58 after 5 trading days, which is a modest upward path from the last close.\n\n**Model quality**\nThe backtest could not be computed because the series is too short. No accuracy figures are available, and it is unknown whether the model beats the naive baseline (beats_naive is not present in the data).\n\n**Interpretation**\nThe forecast is a statistical projection, not a prediction of certain outcomes. Without a backtest, its reliability is unverified, so it should not be used as a basis for decisions on its own. It says nothing about news, market shocks, or longer-term trends.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 411,
+  "output_tokens": 232,
+  "cost_usd": 0.003142,
+  "generated_at": "2026-10-25T05:23:20+00:00"
+}

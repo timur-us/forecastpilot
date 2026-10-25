@@ -3,13 +3,21 @@
     python -m evals.run                      # score every recorded prompt version
     python -m evals.run --version 2026-10-23.1
     python -m evals.run --record --yes       # regenerate the samples (paid API calls)
+    python -m evals.run --record --yes --set holdout
     python -m evals.run --record --yes --case en-nvda-30-beats --samples 3
+
+Two case sets: the golden set (evals/cases/), from which prompt rules are
+derived, and the hold-out set (evals/holdout/), which is only ever scored.
+The report shows them separately.
 
 Gate policy: the pytest in tests/test_evals_suite.py is the CI gate for the
 scorer itself (every metric must detect its failure case on artificial
-answers, and the report must build from the recorded files). The pass rates
-of a recorded baseline are a metric reported here, not a gate: a prompt
-change is judged by comparing two reports, not by a threshold.
+answers, and the report must build from the recorded files) and the
+regression gate between prompt versions: the newest recorded version must
+not have a lower case pass rate than the previous one on any correctness
+metric (numbers_match, verdict, coverage, complete). All other pass rates
+are metrics, not gates: a prompt change is judged by comparing two reports
+under the scoring rule written at the top of each report.
 
 Recording calls app.commentary.call_model directly (the Anthropic API, not
 the deployed service), so the daily cache is bypassed and every sample is an
@@ -24,10 +32,19 @@ from collections import Counter, defaultdict
 from datetime import datetime, timezone
 from pathlib import Path
 
-from evals.score import METRICS, SPEC_GAPS, payload_for, score
+from evals.score import (
+    COMMUNICATION_METRICS,
+    CORRECTNESS_METRICS,
+    METRICS,
+    SCORER_CHANGELOG,
+    SCORING_RULE,
+    SPEC_GAPS,
+    payload_for,
+    score,
+)
 
 ROOT = Path(__file__).resolve().parent
-CASES_DIR = ROOT / "cases"
+SETS = {"golden": ROOT / "cases", "holdout": ROOT / "holdout"}
 RECORDED_DIR = ROOT / "recorded"
 RESULTS_DIR = ROOT / "results"
 SAMPLES = 3
@@ -38,11 +55,14 @@ _INPUT_TOKENS = 461
 _OUTPUT_TOKENS_RANGE = (265, 676)
 
 
-def load_cases(only: str | None = None) -> list:
-    cases = [
-        json.loads(path.read_text(encoding="utf-8"))
-        for path in sorted(CASES_DIR.glob("*.json"))
-    ]
+def load_cases(only: str | None = None, sets: tuple = tuple(SETS)) -> list:
+    """Cases of the given sets, each tagged with its set name."""
+    cases = []
+    for name in sets:
+        for path in sorted(SETS[name].glob("*.json")):
+            case = json.loads(path.read_text(encoding="utf-8"))
+            case["set"] = name
+            cases.append(case)
     if only:
         cases = [c for c in cases if c["id"] == only]
         if not cases:
@@ -50,10 +70,18 @@ def load_cases(only: str | None = None) -> list:
     return cases
 
 
+def version_key(version: str) -> tuple:
+    """Sort key for 'YYYY-MM-DD.N' labels: the date, then the counter."""
+    date, _, counter = version.partition(".")
+    return (date, int(counter or 0))
+
+
 def recorded_versions() -> list:
     if not RECORDED_DIR.exists():
         return []
-    return sorted(p.name for p in RECORDED_DIR.iterdir() if p.is_dir())
+    return sorted(
+        (p.name for p in RECORDED_DIR.iterdir() if p.is_dir()), key=version_key
+    )
 
 
 def load_samples(version: str) -> list:
@@ -73,17 +101,22 @@ def score_samples(samples: list, cases: list) -> list:
             case, sample.get("text"), sample.get("stop_reason"), sample.get("error")
         )
         scored.append(
-            {"case_id": case["id"], "sample": sample["sample"], "results": results}
+            {
+                "case_id": case["id"],
+                "set": case["set"],
+                "sample": sample["sample"],
+                "results": results,
+            }
         )
     return scored
 
 
-def summarize(scored: list) -> dict:
-    """Pass rates per metric over samples, over cases, over complete samples."""
+def _metric_table(scored: list) -> dict:
+    """Per metric: pass counts over samples, cases and complete samples."""
     per_case = defaultdict(list)
     for entry in scored:
         per_case[entry["case_id"]].append(entry)
-    metrics = {}
+    table = {}
     for metric in METRICS:
         passed = [e["results"][metric].passed for e in scored]
         complete = [e for e in scored if e["results"]["complete"].passed]
@@ -96,7 +129,7 @@ def summarize(scored: list) -> dict:
             for cid, es in per_case.items()
             if len({e["results"][metric].passed for e in es}) > 1
         )
-        metrics[metric] = {
+        table[metric] = {
             "samples_passed": sum(passed),
             "samples": len(passed),
             "cases_passed": sum(case_pass.values()),
@@ -105,8 +138,18 @@ def summarize(scored: list) -> dict:
             "complete": len(complete),
             "unstable": unstable,
         }
+    return table
+
+
+def summarize(scored: list) -> dict:
+    """Pass rates per set and over all cases, plus failures and hints."""
+    sets = {
+        name: _metric_table([e for e in scored if e["set"] == name])
+        for name in SETS
+        if any(e["set"] == name for e in scored)
+    }
     failures = [
-        (e["case_id"], e["sample"], metric, e["results"][metric].reason)
+        (e["set"], e["case_id"], e["sample"], metric, e["results"][metric].reason)
         for e in scored
         for metric in METRICS
         if not e["results"][metric].passed
@@ -117,68 +160,136 @@ def summarize(scored: list) -> dict:
             for hint in e["results"][metric].hints:
                 tag, _, message = hint.partition(": ")
                 hints[tag].append((e["case_id"], e["sample"], metric, message))
-    return {"metrics": metrics, "failures": failures, "hints": dict(hints)}
+    return {
+        "sets": sets,
+        "all": _metric_table(scored),
+        "failures": failures,
+        "hints": dict(hints),
+    }
+
+
+def case_pass_rate(summary: dict, metric: str, set_name: str | None = None) -> float:
+    """Share of cases passing `metric` (all samples), in one set or over all."""
+    table = summary["all"] if set_name is None else summary["sets"][set_name]
+    m = table[metric]
+    return m["cases_passed"] / m["cases"] if m["cases"] else 0.0
 
 
 def _pct(part: int, whole: int) -> str:
     return f"{part}/{whole}" + (f" ({100 * part // whole}%)" if whole else "")
 
 
+def _group(metric: str) -> str:
+    if metric in CORRECTNESS_METRICS:
+        return "correctness"
+    if metric in COMMUNICATION_METRICS:
+        return "communication"
+    return "contract"
+
+
 def render_table(summary: dict) -> str:
-    rows = [
-        "metric          samples        cases (all samples)  complete only   unstable"
-    ]
-    for metric, m in summary["metrics"].items():
+    rows = []
+    for name, table in summary["sets"].items():
+        rows.append(f"[{name}]")
         rows.append(
-            f"{metric:<15} {_pct(m['samples_passed'], m['samples']):<14} "
-            f"{_pct(m['cases_passed'], m['cases']):<20} "
-            f"{_pct(m['complete_passed'], m['complete']):<15} {len(m['unstable'])}"
+            "metric          group          samples        cases (all samples)  "
+            "complete only   unstable"
         )
+        for metric, m in table.items():
+            rows.append(
+                f"{metric:<15} {_group(metric):<14} "
+                f"{_pct(m['samples_passed'], m['samples']):<14} "
+                f"{_pct(m['cases_passed'], m['cases']):<20} "
+                f"{_pct(m['complete_passed'], m['complete']):<15} {len(m['unstable'])}"
+            )
     return "\n".join(rows)
 
 
+def _set_header(name: str, samples: list, scored: list) -> str:
+    ids = {e["case_id"] for e in scored if e["set"] == name}
+    if not ids:
+        return f"{name}: not recorded"
+    per_case = Counter(e["case_id"] for e in scored if e["set"] == name)
+    entries = [e for e in scored if e["set"] == name]
+    complete = sum(1 for e in entries if e["results"]["complete"].passed)
+    return (
+        f"{name} {len(ids)} cases × {max(per_case.values())} samples = "
+        f"{len(entries)} ({complete} complete)"
+    )
+
+
 def render_markdown(
-    version: str, samples: list, cases: list, scored: list, summary: dict
+    version: str,
+    samples: list,
+    cases: list,
+    scored: list,
+    summary: dict,
+    previous: tuple | None = None,
 ) -> str:
-    ids = sorted({s["case_id"] for s in samples})
-    per_case = Counter(s["case_id"] for s in samples)
-    complete = sum(1 for e in scored if e["results"]["complete"].passed)
+    """The report; `previous` is (version, summary) of the version before."""
     cost = sum(s.get("cost_usd") or 0 for s in samples)
+    tokens = [s["output_tokens"] for s in samples if s.get("output_tokens")]
     models = sorted({s["model"] for s in samples if s.get("model")})
     stamps = sorted(s["generated_at"] for s in samples if s.get("generated_at"))
     recorded = f"{stamps[0][:16]} to {stamps[-1][:16]} UTC" if stamps else "n/a"
+    per_commentary = (
+        f"mean {sum(tokens) / len(tokens):.0f} output tokens and "
+        f"{cost / len(tokens):.4f} USD per commentary"
+        if tokens
+        else "no token figures"
+    )
 
     out = [f"# Commentary eval — prompt {version}", ""]
     out.append(
         f"Recorded {recorded} · model {', '.join(models) or 'n/a'} · "
-        f"{len(ids)} cases × {max(per_case.values()) if per_case else 0} samples = "
-        f"{len(samples)} samples ({complete} complete) · total cost {cost:.2f} USD"
+        + " · ".join(_set_header(name, samples, scored) for name in SETS)
+        + f" · total cost {cost:.2f} USD · {per_commentary}"
     )
+    out += ["", f"**Scoring rule.** {SCORING_RULE}"]
+    if previous:
+        out.append(f"Δ columns compare case pass rates with prompt {previous[0]}.")
     out += [
         "",
         "With three samples per case the suite shows instability, not statistical "
         "significance; a difference of one or two cases between prompt versions is "
         "noise and is reported as such. A case passes a metric only when all of its "
         "samples pass.",
-        "",
-        "## Pass rates",
-        "",
-        "| Metric | Samples | Cases (all samples) | Complete samples only | Unstable cases |",
-        "| --- | --- | --- | --- | --- |",
     ]
-    for metric, m in summary["metrics"].items():
-        out.append(
-            f"| {metric} | {_pct(m['samples_passed'], m['samples'])} | "
-            f"{_pct(m['cases_passed'], m['cases'])} | "
-            f"{_pct(m['complete_passed'], m['complete'])} | "
-            f"{', '.join(m['unstable']) or '—'} |"
-        )
+
+    for name in SETS:
+        table = summary["sets"].get(name)
+        title = "Golden set" if name == "golden" else "Hold-out set"
+        out += ["", f"## {title}", ""]
+        if not table:
+            out.append("Not recorded for this version.")
+            continue
+        header = "| Metric | Group | Samples | Cases (all samples) | Complete samples only | Unstable cases |"
+        rule = "| --- | --- | --- | --- | --- | --- |"
+        if previous and name in previous[1]["sets"]:
+            header += " Δ cases |"
+            rule += " --- |"
+        out += [header, rule]
+        for metric, m in table.items():
+            row = (
+                f"| {metric} | {_group(metric)} | {_pct(m['samples_passed'], m['samples'])} | "
+                f"{_pct(m['cases_passed'], m['cases'])} | "
+                f"{_pct(m['complete_passed'], m['complete'])} | "
+                f"{', '.join(m['unstable']) or '—'} |"
+            )
+            if previous and name in previous[1]["sets"]:
+                before = previous[1]["sets"][name][metric]["cases_passed"]
+                delta = m["cases_passed"] - before
+                row += f" {delta:+d} |"
+            out.append(row)
 
     out += ["", "## Failures", ""]
     if summary["failures"]:
-        out += ["| Case | Sample | Metric | Reason |", "| --- | --- | --- | --- |"]
-        for cid, n, metric, reason in summary["failures"]:
-            out.append(f"| {cid} | {n} | {metric} | {_cell(reason)} |")
+        out += [
+            "| Set | Case | Sample | Metric | Reason |",
+            "| --- | --- | --- | --- | --- |",
+        ]
+        for set_name, cid, n, metric, reason in summary["failures"]:
+            out.append(f"| {set_name} | {cid} | {n} | {metric} | {_cell(reason)} |")
     else:
         out.append("None.")
 
@@ -192,6 +303,15 @@ def render_markdown(
     else:
         out.append("None.")
 
+    out += ["", "## Scorer changes", ""]
+    out.append(
+        "The scorer changes only with evidence: a sample on which it measured "
+        "wrongly. Every change is listed here and applies to all versions."
+    )
+    out += ["", "| Date | Change | Evidence |", "| --- | --- | --- |"]
+    for date, change, evidence in SCORER_CHANGELOG:
+        out.append(f"| {date} | {_cell(change)} | {_cell(evidence)} |")
+
     out += ["", "## Spec gaps", ""]
     out.append(
         "Points the prompt leaves open. They are listed here as input for the next "
@@ -201,17 +321,18 @@ def render_markdown(
     for tag, description in SPEC_GAPS:
         out.append(f"- **{tag}** {description}")
 
+    recorded_ids = {s["case_id"] for s in samples}
     out += [
         "",
         "## Cases",
         "",
-        "| Case | Language | Horizon | Verdict | Covers |",
-        "| --- | --- | --- | --- | --- |",
+        "| Set | Case | Language | Horizon | Verdict | Covers |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     for case in cases:
-        if case["id"] in per_case:
+        if case["id"] in recorded_ids:
             out.append(
-                f"| {case['id']} | {case['language']} | {case['horizon']} | "
+                f"| {case['set']} | {case['id']} | {case['language']} | {case['horizon']} | "
                 f"{case['expect']['verdict']} | {_cell(case['covers'])} |"
             )
     return "\n".join(out) + "\n"
@@ -221,15 +342,26 @@ def _cell(text: str) -> str:
     return text.replace("|", "\\|").replace("\n", " ")
 
 
-def build_report(version: str) -> tuple:
-    """(markdown, summary) for one recorded prompt version."""
-    cases = load_cases()
+def build_summary(version: str, cases: list | None = None) -> tuple:
+    """(samples, scored, summary) for one recorded prompt version."""
+    cases = cases or load_cases()
     samples = load_samples(version)
     if not samples:
         raise SystemExit(f"no recorded samples under {RECORDED_DIR / version}")
     scored = score_samples(samples, cases)
-    summary = summarize(scored)
-    return render_markdown(version, samples, cases, scored, summary), summary
+    return samples, scored, summarize(scored)
+
+
+def build_report(version: str) -> tuple:
+    """(markdown, summary) for one recorded prompt version."""
+    cases = load_cases()
+    samples, scored, summary = build_summary(version, cases)
+    versions = recorded_versions()
+    previous = None
+    if version in versions and versions.index(version) > 0:
+        prev = versions[versions.index(version) - 1]
+        previous = (prev, build_summary(prev, cases)[2])
+    return render_markdown(version, samples, cases, scored, summary, previous), summary
 
 
 def write_report(version: str) -> Path:
@@ -257,8 +389,9 @@ def record(cases: list, samples: int, yes: bool) -> None:
     low = commentary.cost_usd(_INPUT_TOKENS, _OUTPUT_TOKENS_RANGE[0]) * calls
     high = commentary.cost_usd(_INPUT_TOKENS, _OUTPUT_TOKENS_RANGE[1]) * calls
     model = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-5-5")
+    sets = ", ".join(sorted({c["set"] for c in cases}))
     print(
-        f"Recording {len(cases)} cases × {samples} samples = {calls} calls to the "
+        f"Recording {len(cases)} cases ({sets}) × {samples} samples = {calls} calls to the "
         f"Anthropic API (model {model}, prompt {commentary.PROMPT_VERSION})."
     )
     print(f"Estimated cost {low:.2f}–{high:.2f} USD at the configured prices.")
@@ -318,11 +451,13 @@ def main(argv=None) -> int:
     )
     parser.add_argument("--yes", action="store_true", help="confirm the paid calls")
     parser.add_argument("--case", help="record only this case id")
+    parser.add_argument("--set", choices=tuple(SETS), help="record only this case set")
     parser.add_argument("--samples", type=int, default=SAMPLES, help="samples per case")
     args = parser.parse_args(argv)
 
     if args.record:
-        record(load_cases(args.case), args.samples, args.yes)
+        sets = (args.set,) if args.set else tuple(SETS)
+        record(load_cases(args.case, sets), args.samples, args.yes)
         return 0
     versions = [args.version] if args.version else recorded_versions()
     if not versions:

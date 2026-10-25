@@ -1,0 +1,12 @@
+{
+  "case_id": "en-pfe-90-negative-drift",
+  "sample": 1,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nPFE last closed at 24.86. The forecast starts at 24.70 and ends at 23.15 after 90 trading days, pointing to a lower path from the last close.\n\n**Model quality**\nOver a 90-day backtest horizon, the model's MAE was 1.1023 versus 0.9861 for the naive baseline. Its MAPE was 4.12%. Since beats_naive is False, the model did not outperform the naive baseline.\n\n**Interpretation**\nThe forecast is a statistical projection, not a certainty. Because the model underperformed the naive baseline in backtesting, the projected decline to 23.15 should be treated with caution rather than as a reliable signal. The forecast does not account for news, earnings, or other market events.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 460,
+  "output_tokens": 653,
+  "cost_usd": 0.00745,
+  "generated_at": "2026-10-25T05:23:42+00:00"
+}

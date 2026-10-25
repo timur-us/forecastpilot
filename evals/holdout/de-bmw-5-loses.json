@@ -1,0 +1,22 @@
+{
+  "id": "de-bmw-5-loses",
+  "ticker": "BMW.DE",
+  "language": "de",
+  "horizon": 5,
+  "last_close": 78.42,
+  "forecast": [78.3, 78.14, 77.97, 77.81, 77.65],
+  "metrics": {
+    "backtest_horizon": 5,
+    "mae_model": 1.221,
+    "mae_naive": 1.1534,
+    "mape_model_pct": 1.47,
+    "beats_naive": false
+  },
+  "expect": {
+    "language": "de",
+    "verdict": "does_not_beat",
+    "disclaimer": "Bildungsanalyse — keine Anlageberatung.",
+    "max_words": 150
+  },
+  "covers": "hold-out: beats_naive false, short horizon"
+}

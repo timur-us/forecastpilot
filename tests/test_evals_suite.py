@@ -8,9 +8,15 @@ from collections import Counter
 import pytest
 
 from evals import run, score
-from evals.score import METRICS
+from evals.score import (
+    COMMUNICATION_METRICS,
+    CONTRACT_METRICS,
+    CORRECTNESS_METRICS,
+    METRICS,
+)
 
-CASES = {c["id"]: c for c in run.load_cases()}
+CASES = {c["id"]: c for c in run.load_cases(sets=("golden",))}
+HOLDOUT = {c["id"]: c for c in run.load_cases(sets=("holdout",))}
 
 # Live reply of the deployed service, README example (NVDA, 30 days, en).
 NVDA_TEXT = """**1. Price movement**
@@ -73,10 +79,10 @@ def _hints(results):
 # --- the real replies pass ---------------------------------------------------
 
 
-def test_real_english_reply_passes_every_metric_without_hints():
+def test_real_english_reply_meets_the_contract_without_hints():
     results = _score(NVDA, NVDA_TEXT)
 
-    assert _failed(results) == set()
+    assert _failed(results) & set(CONTRACT_METRICS) == set()
     assert _hints(results) == []
     assert results["verdict"].info["scoped_to_part_2"] is True
     assert results["coverage"].info["cited"] == [
@@ -85,14 +91,47 @@ def test_real_english_reply_passes_every_metric_without_hints():
         "forecast end",
     ]
     assert results["length"].info["words"] == 121
+    # The weaknesses the communication metrics were built for:
+    assert results["jargon_free"].reason == "code in the text: True, beats_naive"
+    assert results["label_format"].reason.startswith(
+        "expected **Price movement**, **Model quality**, **Interpretation**; "
+        "written as '**1. Price movement**'"
+    )
+    assert results["locale_numbers"].passed is True
+    assert results["no_title_line"].passed is True
 
 
-def test_real_german_reply_passes_every_metric_without_hints():
+def test_real_german_reply_meets_the_contract_without_hints():
     results = _score(SAP_CASE, SAP_TEXT)
 
-    assert _failed(results) == set()
+    assert _failed(results) & set(CONTRACT_METRICS) == set()
     assert _hints(results) == []
     assert results["language"].info["function_words"]["en"] == 0
+    assert results["jargon_free"].reason == "code in the text: False, beats_naive"
+    assert results["label_format"].reason.startswith(
+        "expected **Kursbewegung**, **Modellgüte**, **Einschränkung**; "
+        "written as '**Kursbewegung:** SAP.DE schloss zuletzt bei 201,5'"
+    )
+    assert results["locale_numbers"].passed is True
+    assert results["no_title_line"].passed is True
+
+
+def test_metric_groups_partition_the_metrics():
+    assert set(CONTRACT_METRICS) | set(COMMUNICATION_METRICS) == set(METRICS)
+    assert set(CORRECTNESS_METRICS) < set(CONTRACT_METRICS)
+    assert not set(CONTRACT_METRICS) & set(COMMUNICATION_METRICS)
+
+
+def test_hold_out_cases_are_separate_and_cover_the_required_shapes():
+    assert len(HOLDOUT) == 6 and not set(HOLDOUT) & set(CASES)
+    languages = [c["language"] for c in HOLDOUT.values()]
+    assert languages.count("en") == 3 and languages.count("de") == 3
+    assert any(c["expect"]["verdict"] == "no_backtest" for c in HOLDOUT.values())
+    assert any(
+        c["language"] == "de" and c["last_close"] > 10_000 for c in HOLDOUT.values()
+    )
+    for case in HOLDOUT.values():
+        assert case["set"] == "holdout" and case["horizon"] == len(case["forecast"])
 
 
 def test_case_files_cover_the_mandatory_edge_cases():
@@ -389,7 +428,7 @@ Educational analysis — not investment advice."""
         "The model fits the recent trend well and the error over the 30-day horizon is small.",
     )
 
-    assert _failed(_score(NO_BACKTEST, clean)) == set()
+    assert _failed(_score(NO_BACKTEST, clean)) & set(CONTRACT_METRICS) == set()
     assert "cites a metric figure" in _score(NO_BACKTEST, cites)["verdict"].reason
     assert (
         _score(NO_BACKTEST, silent)["verdict"].reason
@@ -420,7 +459,7 @@ Bildungsanalyse — keine Anlageberatung."""
         "Das Modell folgt dem jüngsten Trend und der Fehler über 30 Handelstage ist klein.",
     )
 
-    assert _failed(_score(case, clean)) == set()
+    assert _failed(_score(case, clean)) & set(CONTRACT_METRICS) == set()
     assert _score(case, other_wording)["verdict"].passed is True
     assert "cites a metric figure" in _score(case, cites)["verdict"].reason
     assert _score(case, silent)["verdict"].reason == (
@@ -445,8 +484,9 @@ def test_interpretation_is_a_valid_label_in_both_languages():
 
     for text in (de_single, de_pair, de_plural):
         results = _score(SAP_CASE, text)
-        assert _failed(results) == set() and _hints(results) == []
-    assert _failed(_score(NVDA, en_pair)) == set()
+        assert _failed(results) & set(CONTRACT_METRICS) == set()
+        assert _hints(results) == []
+    assert _failed(_score(NVDA, en_pair)) & set(CONTRACT_METRICS) == set()
     assert (
         "label in de in label position" in _score(NVDA, en_foreign)["language"].reason
     )
@@ -519,28 +559,163 @@ def test_a_recorded_error_fails_every_metric_with_the_error():
     assert _failed(results) == set(METRICS)
 
 
+# --- communication metrics ------------------------------------------------------
+
+CLEAN_EN = """**Price movement**
+NVDA last closed at 221.97. The forecast starts at 221.78 and ends at 226.34 after 30 trading days, above the last close.
+
+**Model quality**
+Over a 30-day backtest horizon the model's MAE was 6.1651 against 6.4573 for the naive baseline, with a MAPE of 2.77%. The model beats the naive baseline by a narrow margin.
+
+**Interpretation**
+The forecast is a statistical projection from past prices and does not account for news or market shocks. A narrow backtest edge does not guarantee future accuracy.
+
+Educational analysis — not investment advice."""
+
+
+def test_clean_prose_passes_every_metric():
+    results = _score(NVDA, CLEAN_EN)
+
+    assert _failed(results) == set()
+
+
+def test_jargon_free_flags_identifiers_and_python_literals_but_not_vocabulary():
+    with_code = CLEAN_EN.replace(
+        "The model beats the naive baseline by a narrow margin.",
+        "mae_model is below mae_naive, so beats_naive is True.",
+    )
+    results = _score(NVDA, with_code)
+
+    assert results["jargon_free"].reason == (
+        "code in the text: True, beats_naive, mae_model, mae_naive"
+    )
+    assert _score(NVDA, CLEAN_EN)["jargon_free"].passed is True  # MAE, MAPE, backtest
+
+
+@pytest.mark.parametrize(
+    "token, locale",
+    [
+        ("18.234,56", "de"),
+        ("18,234.56", "en"),
+        ("6,88", "de"),
+        ("6.88", "en"),
+        ("2.7679", "en"),
+        ("2,7679", "de"),
+        ("1.234.567", "de"),
+        ("1,234,567", "en"),
+        ("1.500", None),
+        ("41,828", None),
+    ],
+)
+def test_number_locale(token, locale):
+    assert score._number_locale(token) == locale
+
+
+def test_locale_numbers_fails_on_the_other_format_and_ignores_ambiguous_tokens():
+    german_with_english_decimals = SAP_TEXT.replace("201,55", "201.55")
+    results = _score(SAP_CASE, german_with_english_decimals)
+
+    assert results["locale_numbers"].reason == "not de number format: 201.55"
+    assert _score(SAP_CASE, SAP_TEXT)["locale_numbers"].passed is True
+    english_with_a_comma = CLEAN_EN.replace("2.77%", "2,77%")
+    assert _score(NVDA, english_with_a_comma)["locale_numbers"].reason == (
+        "not en number format: 2,77"
+    )
+    ambiguous = CLEAN_EN.replace("with a MAPE of 2.77%", "roughly 1,500 shares")
+    assert _score(NVDA, ambiguous)["locale_numbers"].passed is True
+
+
+def test_no_title_line_fails_on_any_line_before_part_1():
+    results = _score(NVDA, "NVDA — 30-day commentary\n\n" + CLEAN_EN)
+
+    assert (
+        results["no_title_line"].reason
+        == "line before part 1: 'NVDA - 30-day commentary'"
+    )
+    assert results["structure"].passed is True  # tolerated there, with a hint
+
+
+def test_label_format_requires_bold_own_line_exact_name_no_number():
+    numbered = CLEAN_EN.replace("**Price movement**", "**1. Price movement**")
+    colon = CLEAN_EN.replace("**Model quality**", "**Model quality:**")
+    inline = CLEAN_EN.replace(
+        "**Interpretation**\nThe forecast", "**Interpretation:** The forecast"
+    )
+    plain = CLEAN_EN.replace("**Price movement**", "Price movement")
+    synonym = CLEAN_EN.replace("**Interpretation**", "**Limitations**")
+
+    assert _score(NVDA, numbered)["label_format"].reason == (
+        "expected **Price movement**; written as '**1. Price movement**'"
+    )
+    assert _score(NVDA, colon)["label_format"].reason == (
+        "expected **Model quality**; written as '**Model quality:**'"
+    )
+    assert _score(NVDA, inline)["label_format"].reason.startswith(
+        "expected **Interpretation**; written as '**Interpretation:** The forecast"
+    )
+    assert _score(NVDA, plain)["label_format"].reason == (
+        "expected **Price movement**; written as 'Price movement'"
+    )
+    assert _score(NVDA, synonym)["label_format"].reason == (
+        "expected **Interpretation**; written as '**Limitations**'"
+    )
+    assert _score(NVDA, synonym)["structure"].passed is True  # the contract allows it
+
+
 # --- the recorded baseline and the report -------------------------------------
 
 
 def test_recorded_baseline_scores_and_the_report_builds():
     versions = run.recorded_versions()
     assert versions, "no recorded baseline under evals/recorded/"
+    all_cases = set(CASES) | set(HOLDOUT)
 
     for version in versions:
         samples = run.load_samples(version)
         markdown, summary = run.build_report(version)
 
-        assert {s["case_id"] for s in samples} == set(CASES)
+        assert {s["case_id"] for s in samples} == all_cases
         assert Counter(s["case_id"] for s in samples) == {
-            cid: run.SAMPLES for cid in CASES
+            cid: run.SAMPLES for cid in all_cases
         }
         assert all(s["prompt_version"] == version for s in samples)
         assert f"# Commentary eval — prompt {version}" in markdown
+        assert "**Scoring rule.**" in markdown
+        assert "## Golden set" in markdown and "## Hold-out set" in markdown
         for metric in METRICS:
             assert f"| {metric} |" in markdown
-            assert summary["metrics"][metric]["samples"] == len(samples)
+            assert summary["sets"]["golden"][metric]["cases"] == len(CASES)
+            assert summary["sets"]["holdout"][metric]["cases"] == len(HOLDOUT)
+        assert "## Scorer changes" in markdown
         assert "## Spec gaps" in markdown and "- **G12**" in markdown
-        assert run.render_table(summary).startswith("metric")
+        assert run.render_table(summary).startswith("[golden]")
+
+
+def test_regression_gate_correctness_never_falls_between_prompt_versions():
+    """The newest recorded prompt version must not lose a case on any
+    correctness metric against the previous one. Communication metrics are
+    reported, not gated. Never adjust the scorer to make this green."""
+    versions = run.recorded_versions()
+    if len(versions) < 2:
+        pytest.skip("one prompt version recorded; nothing to compare")
+    previous, newest = versions[-2], versions[-1]
+    before = run.build_summary(previous)[2]
+    after = run.build_summary(newest)[2]
+
+    for metric in CORRECTNESS_METRICS:
+        assert run.case_pass_rate(after, metric) >= run.case_pass_rate(
+            before, metric
+        ), f"{metric}: {newest} passes fewer cases than {previous}"
+
+
+def test_version_keys_sort_by_date_then_counter():
+    assert sorted(
+        ["2026-10-23.10", "2026-10-23.2", "2026-10-22.9"], key=run.version_key
+    ) == [
+        "2026-10-22.9",
+        "2026-10-23.2",
+        "2026-10-23.10",
+    ]
 
 
 def test_committed_report_matches_the_recorded_samples():
@@ -559,7 +734,7 @@ def test_record_refuses_without_confirmation_and_in_ci(monkeypatch, capsys):
 
     with pytest.raises(SystemExit, match="--yes"):
         run.record(cases, samples=3, yes=False)
-    assert "1 cases × 3 samples = 3 calls" in capsys.readouterr().out
+    assert "1 cases (golden) × 3 samples = 3 calls" in capsys.readouterr().out
 
     monkeypatch.setenv("CI", "true")
     with pytest.raises(SystemExit, match="never runs in CI"):
@@ -567,7 +742,7 @@ def test_record_refuses_without_confirmation_and_in_ci(monkeypatch, capsys):
 
 
 def test_case_files_are_valid_json_with_the_documented_fields():
-    for path in sorted(run.CASES_DIR.glob("*.json")):
+    for path in sorted(p for d in run.SETS.values() for p in d.glob("*.json")):
         case = json.loads(path.read_text(encoding="utf-8"))
         assert path.stem == case["id"]
         assert set(case) == {

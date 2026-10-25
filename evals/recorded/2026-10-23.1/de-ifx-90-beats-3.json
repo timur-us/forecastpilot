@@ -1,0 +1,12 @@
+{
+  "case_id": "de-ifx-90-beats",
+  "sample": 3,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung:** IFX.DE schloss zuletzt bei 33,18. Die Prognose beginnt bei 33,40 und endet nach 90 Handelstagen bei 36,02.\n\n**Modellgüte:** Im Backtest über 90 Handelstage erreicht das Modell einen MAE von 1,3875, die naive Referenzprognose einen MAE von 1,6102. Der MAPE des Modells liegt bei 3,98 %. Damit schlägt das Modell die naive Baseline (beats_naive: True).\n\n**Einschränkung / Interpretation:** Die Prognose beschreibt einen statistisch erwarteten Pfad, keine Gewissheit. Unvorhersehbare Ereignisse, Marktschocks oder Unternehmensnachrichten sind nicht abgebildet. Der Vorsprung gegenüber der Baseline bezieht sich auf die Vergangenheit und garantiert keine künftige Treffsicherheit.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 463,
+  "output_tokens": 871,
+  "cost_usd": 0.009636,
+  "generated_at": "2026-10-25T05:23:08+00:00"
+}

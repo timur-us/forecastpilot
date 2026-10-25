@@ -23,6 +23,16 @@ coverage       part 1 cites the last close, the forecast start and the
                the guard's number parsing and tolerance.
 length         at most 150 words, labels and disclaimer included.
 complete       stop_reason end_turn and a non-empty text.
+
+Communication metrics (weaknesses the baseline showed within the contract):
+
+jargon_free    no code in the prose: no snake_case identifiers such as
+               beats_naive or mae_model, no True/False literals.
+locale_numbers every number with a separator in the target language's
+               format (DE 18.234,56 and 6,88; EN 18,234.56 and 6.88).
+no_title_line  nothing before the part 1 label.
+label_format   each label a line of exactly **Name** (TARGET_LABELS): bold,
+               own line, exact name, no number, no colon.
 """
 
 import re
@@ -40,7 +50,48 @@ METRICS = (
     "coverage",
     "length",
     "complete",
+    "jargon_free",
+    "locale_numbers",
+    "no_title_line",
+    "label_format",
 )
+# The seven contract metrics measure what the prompt demands. Four of them
+# are correctness metrics: they must never fall between prompt versions
+# (the regression gate in tests/test_evals_suite.py).
+CONTRACT_METRICS = METRICS[:7]
+CORRECTNESS_METRICS = ("numbers_match", "verdict", "coverage", "complete")
+# The four communication metrics measure weaknesses the baseline showed
+# although it met the contract: code in the prose, mixed number formats,
+# title lines, varying label forms. They are metrics, not gates.
+COMMUNICATION_METRICS = METRICS[7:]
+
+# A version is judged by this rule, fixed before any version beyond the
+# baseline was recorded.
+SCORING_RULE = (
+    "A prompt version counts as better than the previous one when the four "
+    "communication metrics (jargon_free, locale_numbers, no_title_line, "
+    "label_format) rise and no correctness metric (numbers_match, verdict, "
+    "coverage, complete) falls, measured as case pass rates on the golden set; "
+    "the hold-out set is reported alongside as a check that the rules were not "
+    "tuned to the golden set."
+)
+
+# Changes to the scorer, each with the sample that showed it measuring wrongly.
+SCORER_CHANGELOG = (
+    (
+        "2026-10-24",
+        "verdict: the English 'lags' in the subject-neutral negative list matched the German 'lag' (past tense of liegen); narrowed to 'lags behind'.",
+        "de-mbg-30-narrow-win-2 under 2026-10-23.1: 'Im Backtest über 30 Tage lag der mittlere absolute Fehler (MAE) des Modells bei 1.4999, ...' was read as a negative verdict.",
+    ),
+)
+
+# The target label format for the communication metric label_format, fixed
+# here and prescribed by prompt v2: one bold line per label, the exact name,
+# no number, no colon. The web app renders a bold-only line as a heading.
+TARGET_LABELS = {
+    "en": ("Price movement", "Model quality", "Interpretation"),
+    "de": ("Kursbewegung", "Modellgüte", "Einschränkung"),
+}
 
 DISCLAIMERS = {
     "en": "Educational analysis — not investment advice.",
@@ -740,6 +791,93 @@ def complete(
     return Result(True)
 
 
+# --- communication metrics ---------------------------------------------------
+
+# snake_case identifiers (beats_naive, mae_model), Python literals, braces and
+# backticks are code; MAE, MAPE and backtest are vocabulary and stay allowed.
+_CODE_RE = re.compile(r"\b[A-Za-z]+_[A-Za-z_]+\b|\b(?:True|False|None)\b|[{}`]")
+
+
+def jargon_free(text: str) -> Result:
+    found = sorted({m.group() for m in _CODE_RE.finditer(text)})
+    if found:
+        return Result(
+            False, "code in the text: " + ", ".join(found), info={"code": found}
+        )
+    return Result(True)
+
+
+_SEP_NUMBER_RE = re.compile(r"(?<![\w.,])\d+(?:[.,]\d+)+(?![\w])")
+
+
+def _number_locale(token: str) -> str | None:
+    """'de' (18.234,56 / 6,88), 'en' (18,234.56 / 6.88) or None when ambiguous."""
+    if "." in token and "," in token:
+        return "de" if token.rfind(",") > token.rfind(".") else "en"
+    sep = "," if "," in token else "."
+    parts = token.split(sep)
+    if len(parts) > 2:  # 1.234.567: grouping only
+        return "de" if sep == "." else "en"
+    head, tail = parts
+    if len(tail) == 3 and len(head) <= 3:
+        return None  # 1.500 / 1,500: a thousand or a decimal, cannot tell
+    return "de" if sep == "," else "en"
+
+
+def locale_numbers(text: str, lang: str) -> Result:
+    """Every number with a separator is in the target language's format."""
+    judged = {token: _number_locale(token) for token in _SEP_NUMBER_RE.findall(text)}
+    wrong = sorted(
+        token for token, locale in judged.items() if locale and locale != lang
+    )
+    info = {"numbers": judged}
+    if wrong:
+        return Result(
+            False, f"not {lang} number format: " + ", ".join(wrong), info=info
+        )
+    return Result(True, info=info)
+
+
+def no_title_line(text: str, lang: str) -> Result:
+    lines = _lines(text)
+    found = _label_lines(lines, lang)
+    if not found[0]:
+        return Result(False, "part 1 label not found")
+    before = lines[: found[0][0]]
+    if before:
+        return Result(False, f"line before part 1: {before[0]!r}")
+    return Result(True)
+
+
+def label_format(text: str, lang: str) -> Result:
+    """Each label is a line of exactly **Name**: bold, own line, no number."""
+    raw = [line.strip() for line in text.splitlines() if line.strip()]
+    expected = [f"**{name}**" for name in TARGET_LABELS[lang]]
+    missing = [e for e in expected if e not in raw]
+    if not missing:
+        return Result(True)
+    lines = _lines(text)
+    found = _label_lines(lines, lang)
+    written = []
+    for idx in range(3):
+        if expected[idx] in raw or not found[idx]:
+            continue
+        line_index = found[idx][0]
+        written.append(_raw_line(text, lines[line_index]))
+    reason = "expected " + ", ".join(missing)
+    if written:
+        reason += "; written as " + ", ".join(repr(w[:50]) for w in written)
+    return Result(False, reason, info={"written": written})
+
+
+def _raw_line(text: str, normalized_line: str) -> str:
+    """The raw line that normalises to `normalized_line` (first match)."""
+    for line in text.splitlines():
+        if normalize(line) == normalized_line:
+            return line.strip()
+    return normalized_line
+
+
 def score(
     case: dict, text: str | None, stop_reason: str | None, error: str | None = None
 ) -> dict:
@@ -757,4 +895,8 @@ def score(
     results["verdict"] = verdict(text, lang, case["expect"]["verdict"], payload)
     results["coverage"] = coverage(text, lang, payload)
     results["length"] = length(text, lang, case["expect"]["max_words"])
+    results["jargon_free"] = jargon_free(text)
+    results["locale_numbers"] = locale_numbers(text, lang)
+    results["no_title_line"] = no_title_line(text, lang)
+    results["label_format"] = label_format(text, lang)
     return {metric: results[metric] for metric in METRICS}
