@@ -231,12 +231,38 @@ def test_phone_layout_never_scrolls_sideways(app):
 
 
 def test_a_csp_violation_would_be_caught(app):
-    """The checks above can fail: a request the CSP blocks is seen twice."""
+    """The checks above can fail: a request the CSP blocks is seen twice,
+    and assert_clean fails on either sighting alone, on an uncaught error,
+    on a console error and on an expected failure that never happened."""
+    page = app.page
     app.open()
-    with app.page.expect_console_message(lambda m: "Content Security Policy" in m.text):
-        app.page.evaluate("fetch('http://192.0.2.1/').catch(() => null)")
-    app.page.wait_for_function("window.__csp.length > 0")
-    assert app.page.evaluate("window.__csp") == [
-        "connect-src blocked http://192.0.2.1/"
-    ]
+    app.assert_clean()
+    with page.expect_console_message(lambda m: "Content Security Policy" in m.text):
+        page.evaluate("fetch('http://192.0.2.1/').catch(() => null)")
+    page.wait_for_function("window.__csp.length > 0")
+    assert page.evaluate("window.__csp") == ["connect-src blocked http://192.0.2.1/"]
     assert app.page_errors == []
+
+    console = list(app.console)
+    app.console.clear()  # the listener alone
+    with pytest.raises(AssertionError):
+        app.assert_clean()
+    page.evaluate("window.__csp = []")
+    app.console[:] = console  # the console alone
+    with pytest.raises(AssertionError):
+        app.assert_clean()
+    app.console.clear()
+    app.assert_clean()
+
+    with page.expect_event("pageerror"):
+        page.evaluate("setTimeout(() => { throw new Error('probe'); })")
+    with pytest.raises(AssertionError):
+        app.assert_clean()
+    app.page_errors.clear()
+    with page.expect_console_message(lambda m: m.type == "error"):
+        page.evaluate("console.error('probe')")
+    with pytest.raises(AssertionError):
+        app.assert_clean()
+    app.console.clear()
+    with pytest.raises(AssertionError):
+        app.assert_clean(429)
