@@ -1,0 +1,18 @@
+{
+  "dependencies": [
+    {"name": "example-lib", "version": "1.0.0", "vulns": []},
+    {
+      "name": "example-dep",
+      "version": "2.3.4",
+      "vulns": [
+        {
+          "id": "PYSEC-0000-2",
+          "fix_versions": [],
+          "aliases": [],
+          "description": "Synthetic finding without a fixed version."
+        }
+      ]
+    }
+  ],
+  "fixes": []
+}

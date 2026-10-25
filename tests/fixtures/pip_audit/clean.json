@@ -1,0 +1,7 @@
+{
+  "dependencies": [
+    {"name": "example-lib", "version": "1.0.0", "vulns": []},
+    {"name": "example-dep", "version": "2.3.4", "vulns": []}
+  ],
+  "fixes": []
+}

@@ -1,0 +1,29 @@
+{
+  "dependencies": [
+    {
+      "name": "example-lib",
+      "version": "1.0.0",
+      "vulns": [
+        {
+          "id": "GHSA-0000-0000-0001",
+          "fix_versions": ["1.0.1", "1.1.0"],
+          "aliases": ["CVE-0000-0001"],
+          "description": "Synthetic finding with a fixed version."
+        }
+      ]
+    },
+    {
+      "name": "example-dep",
+      "version": "2.3.4",
+      "vulns": [
+        {
+          "id": "PYSEC-0000-2",
+          "fix_versions": [],
+          "aliases": [],
+          "description": "Synthetic finding without a fixed version."
+        }
+      ]
+    }
+  ],
+  "fixes": []
+}
