@@ -1,0 +1,12 @@
+{
+  "case_id": "en-nvda-30-beats",
+  "sample": 2,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nNVDA last closed at 221.97. The forecast begins at 221.78 and ends at 226.34 after 30 trading days.\n\n**Model quality**\nOver a 30-day backtest, the model's MAE was 6.1651, against 6.4573 for the naive baseline. Its MAPE was 2.77%. The model beats the naive baseline.\n\n**Interpretation**\nThe forecast points to a modest upward drift over the period, but it is a statistical projection, not a certainty. It does not account for earnings, news or sudden market shocks, and the backtest margin over the naive baseline is small. It should be used as one input among several, not as a basis for decisions alone.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 878,
+  "output_tokens": 210,
+  "cost_usd": 0.003856,
+  "generated_at": "2026-10-25T12:29:51+00:00"
+}

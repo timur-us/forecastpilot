@@ -1,0 +1,12 @@
+{
+  "case_id": "de-ifx-90-beats",
+  "sample": 2,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer letzte Schlusskurs von IFX.DE liegt bei 33,18. Die Prognose beginnt bei 33,40 und endet nach 90 Handelstagen bei 36,02.\n\n**Modellgüte**\nIm Backtest über 90 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 1,3875, der mittlere prozentuale Fehler (MAPE) bei 3,98 Prozent. Die naive Vergleichsprognose erreichte einen MAE von 1,6102. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDie Prognose zeigt eine mögliche Kursrichtung auf Basis historischer Muster. Sie garantiert keine Entwicklung, da unerwartete Ereignisse, Marktstimmung und Unternehmensnachrichten nicht berücksichtigt sind. Als alleinige Entscheidungsgrundlage eignet sie sich nicht.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 880,
+  "output_tokens": 324,
+  "cost_usd": 0.005,
+  "generated_at": "2026-10-25T12:30:49+00:00"
+}

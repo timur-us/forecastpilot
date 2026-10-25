@@ -1,0 +1,12 @@
+{
+  "case_id": "de-vna-90-high-mape",
+  "sample": 3,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nVonovia (VNA.DE) schloss zuletzt bei 27,05. Die Prognose startet bei 26,80 und endet nach 90 Handelstagen bei 22,15.\n\n**Modellgüte**\nIm Backtest über 90 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 11,15, der mittlere prozentuale Fehler (MAPE) bei 41,2 Prozent. Die naive Vergleichsprognose erreichte einen MAE von 9,88. Das Modell schlägt die naive Baseline nicht.\n\n**Einschränkung**\nDie Prognose zeigt eine mögliche Richtung, ist aber keine verlässliche Kursvorhersage. Angesichts der hohen Backtest-Fehler sollte sie nur als grobe Orientierung dienen. Unerwartete Marktereignisse, Zinsänderungen oder Unternehmensnachrichten sind darin nicht berücksichtigt und können den Kurs deutlich anders verlaufen lassen.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 879,
+  "output_tokens": 344,
+  "cost_usd": 0.005198,
+  "generated_at": "2026-10-25T12:28:29+00:00"
+}

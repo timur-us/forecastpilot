@@ -1,0 +1,12 @@
+{
+  "case_id": "en-gspc-30-thousands",
+  "sample": 1,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nThe S&P 500 (^GSPC) last closed at 5,812.34. The forecast begins at 5,818.90 and ends at 5,905.12 after 30 trading days.\n\n**Model quality**\nIn a backtest over a 30-day horizon, the model had a mean absolute error (MAE) of 61.23 index points and a mean absolute percentage error (MAPE) of 1.05%. The naive baseline had an MAE of 68.90. The model beats the naive baseline.\n\n**Interpretation**\nThe forecast points to a gradual upward path over the period, but it is a statistical projection and not a certainty. It does not account for unexpected events, policy shifts or earnings surprises, which could move the index well outside the expected range. It should be treated as one input among several and not as a basis for decisions on its own.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 883,
+  "output_tokens": 256,
+  "cost_usd": 0.004326,
+  "generated_at": "2026-10-25T12:29:01+00:00"
+}

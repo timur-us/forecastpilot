@@ -1,0 +1,12 @@
+{
+  "case_id": "en-xyz-30-no-backtest",
+  "sample": 2,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nXYZ last closed at 42.17. The forecast starts at 42.30 and ends at 44.05 after 30 trading days.\n\n**Model quality**\nNo backtest could be run because the price history is too short, so there are no accuracy figures for this forecast and its reliability has not been tested. No backtest was possible.\n\n**Interpretation**\nThe forecast shows the model's central expectation for the path of the price over the next 30 trading days. It does not guarantee that the price will follow this path, and it gives no assessment of risk or of events such as earnings or market shocks. With no backtest, treat it as an unverified indication and not as a basis for decisions on its own.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 828,
+  "output_tokens": 208,
+  "cost_usd": 0.003736,
+  "generated_at": "2026-10-25T12:30:23+00:00"
+}

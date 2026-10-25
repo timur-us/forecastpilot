@@ -1,0 +1,12 @@
+{
+  "case_id": "de-dax-30-thousands",
+  "sample": 3,
+  "prompt_version": "2026-10-25.3",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer DAX (^GDAXI) schloss zuletzt bei 18.234,56 Punkten. Die Prognose startet bei 18.260,10 Punkten und endet nach 30 Handelstagen bei 18.712,45 Punkten.\n\n**Modellgüte**\nIm Backtest über 30 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 198,77 Punkten, der MAE der naiven Vergleichsprognose bei 231,04 Punkten. Der mittlere prozentuale Fehler (MAPE) betrug 1,12 Prozent. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDie Prognose zeigt einen möglichen Verlauf auf Basis historischer Muster, nicht aber ein gesichertes Ergebnis. Sie sagt nichts über unvorhersehbare Ereignisse, Marktschocks oder Nachrichtenlagen aus. Die Fehlerwerte des Backtests zeigen, dass die tatsächlichen Kurse spürbar abweichen können.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 884,
+  "output_tokens": 364,
+  "cost_usd": 0.005408,
+  "generated_at": "2026-10-25T12:27:22+00:00"
+}
