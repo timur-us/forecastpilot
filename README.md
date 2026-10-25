@@ -36,7 +36,7 @@ flowchart TB
         I["Azure ingress · HTTPS"] --> R["FastAPI · rate limit per client<br/>30/h forecast · 5/h commentary"]
         R --> D["Data layer<br/>yfinance · 2y daily closes"]
         D --> F["Forecasting<br/>Holt-Winters + naive backtest"]
-        F --> L["Claude commentary<br/>cache · cost · numbers-match eval · versioned prompt"]
+        F --> L["Claude commentary<br/>structured reply · cache · cost · numbers-match eval · versioned prompt"]
     end
     D --> Y["Yahoo Finance"]
     L --> A["Anthropic API"]
@@ -83,47 +83,47 @@ Since prompt version `2026-10-25.3` the model returns the three parts as a struc
 
 ### Example
 
-`GET /forecast/NVDA?horizon=30&commentary=true&language=en` — a live response from the deployed service (2026-10-22, 12:17 UTC — an earlier run than the screenshot above, recorded before the `history` and `prompt_version` fields were added; the prompt text is unchanged since 2026-08-09, so the current `prompt_version` is shown), shortened:
+`GET /forecast/NVDA?horizon=30&commentary=true&language=en` — a live response from the deployed service (2026-10-25, prompt `2026-10-25.3`, later than the screenshot above), shortened:
 
 ```json
 {
   "ticker": "NVDA",
   "horizon_days": 30,
-  "last_close": 221.97,
-  "forecast": [221.78, 221.93, 222.09, "…", 226.03, 226.18, 226.34],
+  "last_close": 210.96,
+  "forecast": [211.24, "…", 215.36],
   "metrics": {
     "backtest_horizon": 30,
-    "mae_model": 6.1651,
-    "mae_naive": 6.4573,
-    "mape_model_pct": 2.77,
+    "mae_model": 7.7513,
+    "mae_naive": 8.372,
+    "mape_model_pct": 3.43,
     "beats_naive": true
   },
   "commentary": {
-    "text": "**1. Price movement**\nNVDA last closed at 221.97. … (rendered below)",
+    "text": "**Price movement**\nNVDA last closed at 210.96. … (rendered below)",
+    "sections": {"price_movement": "…", "model_quality": "…", "interpretation": "…", "verdict": "The model beats the naive baseline.", "disclaimer": "Educational analysis — not investment advice."},
     "model": "claude-sonnet-5-5",
-    "prompt_version": "2026-10-23.1",
-    "input_tokens": 461,
-    "output_tokens": 265,
-    "cost_usd": 0.003572,
+    "prompt_version": "2026-10-25.3",
+    "input_tokens": 877,
+    "output_tokens": 240,
+    "cost_usd": 0.004154,
     "eval": {"numbers_checked": 8, "numbers_matched": 8, "unmatched": [], "passed": true},
     "stop_reason": "end_turn",
     "truncated": false,
-    "generated_at": "2026-10-22T12:17:50+00:00",
     "cached": false
   }
 }
 ```
 
-The commentary text, rendered:
+The commentary text, rendered. The labels, the verdict sentence and the disclaimer come from the service; the model wrote the prose between them:
 
-> **1. Price movement**
-> NVDA last closed at 221.97. The forecast starts at 221.78 and ends at 226.34 after 30 trading days, which is above the last close.
+> **Price movement**
+> NVDA last closed at 210.96. The 30-trading-day forecast starts at 211.24 and ends at 215.36.
 >
-> **2. Model quality**
-> Over a 30-day backtest horizon, the model's MAE was 6.1651 versus 6.4573 for the naive baseline. Its MAPE was 2.77%. beats_naive is True, so the model beat the naive baseline, though the margin is narrow.
+> **Model quality**
+> Over a 30-day backtest, the model had a mean absolute error (MAE) of 7.7513 and a mean absolute percentage error (MAPE) of 3.43 percent. The naive baseline had an MAE of 8.372. The model beats the naive baseline.
 >
-> **3. Interpretation**
-> The forecast is a statistical projection from past price patterns. It does not account for earnings, news, or market shocks. A backtest edge over the naive baseline does not guarantee future accuracy. The forecast should be read as one input among several, not as a prediction of the outcome.
+> **Interpretation**
+> The forecast points to a modest upward drift from the last close, but it is a statistical estimate, not a certainty. It does not account for earnings, news or sudden market shocks, and actual prices may deviate by roughly the size of the backtest errors or more. It should be treated as one input among several, not as a trading signal.
 >
 > Educational analysis — not investment advice.
 
@@ -131,7 +131,7 @@ Whether the model beats the naive baseline depends on the ticker, the window and
 
 ### What the guard caught — and what it missed
 
-The numbers-match guard has been wrong in both directions. Early on it produced false positives on German commentary: a decimal such as `18,6936` was split at the third digit ([`3efe903`](https://github.com/timur-us/forecastpilot/commit/3efe903), 2026-08-09), and the ordinals of the fixed three-part structure (`**1. Kursbewegung**`) and ambiguous forms like `41,828` were read as invented figures ([`ac729d7`](https://github.com/timur-us/forecastpilot/commit/ac729d7), 2026-09-02). The example above contains exactly that pattern — `**1. Price movement**` — which is why the guard counts 8 numbers rather than 11. It also missed a case: on a cache hit it reported `passed` for commentary that belonged to older prices, because the stored evaluation was returned along with the stored text; since [#5](https://github.com/timur-us/forecastpilot/pull/5) the cache key includes the numbers the text cites and the check is recomputed on every hit. These cases, like the rest of the behaviour, are pinned down by the 160 offline tests.
+The numbers-match guard has been wrong in both directions. Early on it produced false positives on German commentary: a decimal such as `18,6936` was split at the third digit ([`3efe903`](https://github.com/timur-us/forecastpilot/commit/3efe903), 2026-08-09), and the ordinals of the fixed three-part structure (`**1. Kursbewegung**`) and ambiguous forms like `41,828` were read as invented figures ([`ac729d7`](https://github.com/timur-us/forecastpilot/commit/ac729d7), 2026-09-02). The example above contains exactly that pattern — `**1. Price movement**` — which is why the guard counts 8 numbers rather than 11. It also missed a case: on a cache hit it reported `passed` for commentary that belonged to older prices, because the stored evaluation was returned along with the stored text; since [#5](https://github.com/timur-us/forecastpilot/pull/5) the cache key includes the numbers the text cites and the check is recomputed on every hit. On 2026-10-25 it read the 500 in "S&P 500" as a cited figure, in all three samples of one eval case; the fix is logged in the eval report with those samples as its evidence. These cases, like the rest of the behaviour, are pinned down by the 160 offline tests.
 
 ### Evaluation
 
@@ -142,25 +142,30 @@ The guard checks one response at a time. `evals/` turns it into a suite that mea
 - **Golden set and hold-out** — prompt rules are derived from the 20 golden cases only; a hold-out set of 6 cases in `evals/holdout/` (3 English, 3 German, one without backtest, one DAX-sized level) is only ever scored and reported separately.
 - **Recorded baseline** — `python -m evals.run --record --yes` generates three samples per case through the model step (`call_model`: the Anthropic API directly, cache bypassed) after printing the number of calls and the estimated cost; it never runs in CI. `python -m evals.run` scores the recorded files offline and writes `evals/results/<prompt_version>.md`.
 
-Baseline for prompt `2026-10-23.1`, recorded 2026-10-23 and 2026-10-25 with Claude Sonnet 5.5: golden set 20 cases × 3 samples = 60 samples, hold-out 6 × 3 = 18, all complete, 0.44 USD, mean 474 output tokens per commentary (full report: [`evals/results/2026-10-23.1.md`](evals/results/2026-10-23.1.md)).
+Four prompt versions were recorded with the same suite and the same scorer, Claude Sonnet 5.5, golden set 20 cases × 3 samples and hold-out 6 × 3 each (full reports in [`evals/results/`](evals/results/)). One change per version, so every difference has one cause. Cases passing all three samples; hold-out in brackets.
 
-| Metric | Group | Golden samples | Golden cases (all 3) | Hold-out cases (all 3) |
+| Metric | v1 `2026-10-23.1` baseline | v2 `2026-10-25.1` rules, rejected | v2.1 `2026-10-25.2` rules | v3 `2026-10-25.3` structured outputs |
 | --- | --- | --- | --- | --- |
-| numbers_match | correctness | 60/60 | 20/20 | 6/6 |
-| language | contract | 60/60 | 20/20 | 6/6 |
-| structure | contract | 60/60 | 20/20 | 6/6 |
-| verdict | correctness | 60/60 | 20/20 | 6/6 |
-| coverage | correctness | 60/60 | 20/20 | 6/6 |
-| length | contract | 60/60 | 20/20 | 6/6 |
-| complete | correctness | 60/60 | 20/20 | 6/6 |
-| jargon_free | communication | 0/60 | 0/20 | 0/6 |
-| locale_numbers | communication | 47/60 | 15/20 | 3/6 |
-| no_title_line | communication | 57/60 | 17/20 | 6/6 |
-| label_format | communication | 20/60 | 3/20 | 0/6 |
+| jargon_free | 0/20 (0/6) | 20/20 (6/6) | 20/20 (6/6) | 20/20 (6/6) |
+| locale_numbers | 15/20 (3/6) | 20/20 (6/6) | 20/20 (6/6) | 20/20 (6/6) |
+| no_title_line | 17/20 (6/6) | 20/20 (6/6) | 20/20 (6/6) | 20/20 (6/6), by construction |
+| label_format | 3/20 (0/6) | 20/20 (6/6) | 20/20 (6/6) | 20/20 (6/6), by construction |
+| numbers_match | 20/20 (6/6) | 17/20 (3/6) | 20/20 (6/6) | 20/20 (6/6) |
+| structure | 20/20 (6/6) | 18/20 (5/6) | 20/20 (6/6) | 20/20 (6/6), by construction |
+| length | 20/20 (6/6) | 19/20 (5/6) | 20/20 (6/6) | 20/20 (6/6) |
+| verdict, coverage, complete, language | all 100% | all 100% | all 100% | all 100% (verdict sentence by construction) |
+| mean output tokens / cost per commentary | 474 / 0.0057 USD | 327 / 0.0048 USD | 321 / 0.0048 USD | 277 / 0.0045 USD |
 
-The contract holds on every sample. The communication metrics show what the contract does not cover: every reply echoes `beats_naive` as code, 13 of the 30 German replies use English number formats throughout, three replies open with a title line, and only 20 replies use the bold-only label line the web app renders as a heading. With three samples per case the suite shows instability, not statistical significance; a difference of one or two cases between prompt versions is noise and is reported as such. A clean baseline says that the current prompt is followed on these 20 cases, nothing about cases outside the set, and the heuristics have documented limits (a keyword-based verdict, a function-word language check).
+What each step did:
 
-The pytest in `tests/test_evals_suite.py` is the CI gate for the scorer itself: it pins the two replies shown in this README as clean samples, shows every metric detecting its failure case on artificial answers, and rebuilds the committed report from the recorded files. A prompt change is judged by comparing two reports under a rule written into every report before a second version existed: a version is better when the four communication metrics rise and no correctness metric (`numbers_match`, `verdict`, `coverage`, `complete`) falls. The correctness metrics are also a regression gate in CI: the newest recorded version must not pass fewer cases than the previous one. Everything else is a metric, not a gate. `prompt_version` on every commentary block ties a report to the prompt it measures.
+- **Prompt rules (v2 → v2.1)** brought every communication gain: `jargon_free` 0 → 20 from the rule to write plain prose without field names; `locale_numbers` 15 → 20 from the number-format rule; `no_title_line` 17 → 20 from "nothing before the first label"; `label_format` 3 → 20 from fixing the three labels per language as bold lines, which the web app renders as headings.
+- **v2 was rejected.** Its communication metrics rose, but `numbers_match` fell from 20 to 17 cases (hold-out 6 to 3): English replies computed the change between forecast end and last close, a figure not in the data, and two replies restated part 1 after a visible self-correction. It stays in the record. v2.1 adds one rule for part 1 (name the three figures, compute nothing) and nothing else; the computed differences disappear in all 78 replies.
+- **Structured outputs (v3)** did not move a metric v2.1 had not already saturated. What it changed: four structural properties are now guaranteed by the code instead of measured on the model (marked "by construction" above, not model performance); a reply cut off at the budget or otherwise invalid is a `502` instead of a partial text; and the commentary costs 14% fewer output tokens than v2.1. No correctness metric fell at any accepted step.
+- **One scorer change**, with evidence: the guard read the 500 in "S&P 500" as a cited figure in all three samples of one case; the fix is logged in every report under "Scorer changes".
+
+With three samples per case the suite shows instability, not statistical significance; a difference of one or two cases between prompt versions is noise and is reported as such. A clean result says that a prompt is followed on these 26 cases, nothing about cases outside the set, and the heuristics have documented limits (a keyword-based verdict, a function-word language check).
+
+The pytest in `tests/test_evals_suite.py` is the CI gate for the scorer itself: it pins two real replies of the first prompt version as clean samples, shows every metric detecting its failure case on artificial answers, and rebuilds the committed report from the recorded files. A prompt change is judged by comparing two reports under a rule written into every report before a second version existed: a version is better when the four communication metrics rise and no correctness metric (`numbers_match`, `verdict`, `coverage`, `complete`) falls. The correctness metrics are also a regression gate in CI: the newest recorded version must not pass fewer cases than the previous one. Everything else is a metric, not a gate. `prompt_version` on every commentary block ties a report to the prompt it measures.
 
 ### Errors
 
@@ -248,12 +253,13 @@ Every push to `main` and every pull request runs `.github/workflows/ci.yml`: `ru
 - [ ] **W3** Infrastructure as code (Bicep)
 - [x] **W4** CI/CD — GitHub Actions deploys on push to `main`
 - [x] **W5** Observability — token/cost metrics, numbers-match guard on every commentary response
-- [x] **Eval suite** — golden set (20 cases), 7 metrics, recorded baseline per prompt version
-- [ ] **W5** Application Insights
+- [x] **Eval suite** — golden set (20 cases) and hold-out (6), 11 metrics, recorded baseline per prompt version, regression gate in CI
+- [x] **Structured outputs** — measured with the eval suite: v1 → v2.1 → v3, before/after table above
+- [ ] **W5** Application Insights — moves to project 2
 - [x] **W6** Polish — live demo URL, architecture diagram
 - [x] **W6** Screenshots
 - [x] **Web app** — static page on GitHub Pages with the forecast, the verdict, the commentary and the guard result
-- [ ] **W7** RAG add-on — commentary grounded in uploaded reports, with citations
+- [ ] **W7** RAG add-on — commentary grounded in uploaded reports, with citations — moves to project 2
 
 ## Cost controls
 
