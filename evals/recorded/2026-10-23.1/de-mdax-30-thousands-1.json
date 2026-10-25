@@ -1,0 +1,12 @@
+{
+  "case_id": "de-mdax-30-thousands",
+  "sample": 1,
+  "prompt_version": "2026-10-23.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung:** Der letzte Schlusskurs des ^MDAXI lag bei 26412.78. Die Prognose startet bei 26450.30 und endet nach 30 Handelstagen bei 26980.15.\n\n**Modellgüte:** Im Backtest über 30 Tage erreichte das Modell einen MAE von 312.4471, die naive Referenzprognose lag bei 355.0192. Der MAPE des Modells beträgt 1.19 %. Das Modell schlägt die naive Baseline (beats_naive: True).\n\n**Einschränkung:** Die Prognose ist eine statistische Projektion auf Basis historischer Muster, keine Gewissheit. Sie berücksichtigt keine unerwarteten Ereignisse oder Marktschocks. Die Überlegenheit gegenüber der naiven Baseline im Backtest garantiert keine künftige Treffsicherheit.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 467,
+  "output_tokens": 336,
+  "cost_usd": 0.004294,
+  "generated_at": "2026-10-25T05:23:11+00:00"
+}

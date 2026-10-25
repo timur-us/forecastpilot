@@ -1,0 +1,22 @@
+{
+  "id": "en-amzn-30-beats",
+  "ticker": "AMZN",
+  "language": "en",
+  "horizon": 30,
+  "last_close": 226.13,
+  "forecast": [226.4, 226.59, 226.78, 226.97, 227.16, 227.34, 227.53, 227.72, 227.91, 228.1, 228.29, 228.48, 228.67, 228.86, 229.05, 229.23, 229.42, 229.61, 229.8, 229.99, 230.18, 230.37, 230.56, 230.75, 230.94, 231.12, 231.31, 231.5, 231.69, 231.88],
+  "metrics": {
+    "backtest_horizon": 30,
+    "mae_model": 5.912,
+    "mae_naive": 6.2045,
+    "mape_model_pct": 2.41,
+    "beats_naive": true
+  },
+  "expect": {
+    "language": "en",
+    "verdict": "beats",
+    "disclaimer": "Educational analysis — not investment advice.",
+    "max_words": 150
+  },
+  "covers": "hold-out: beats_naive true, positive drift"
+}

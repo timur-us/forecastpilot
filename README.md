@@ -131,31 +131,36 @@ Whether the model beats the naive baseline depends on the ticker, the window and
 
 ### What the guard caught — and what it missed
 
-The numbers-match guard has been wrong in both directions. Early on it produced false positives on German commentary: a decimal such as `18,6936` was split at the third digit ([`3efe903`](https://github.com/timur-us/forecastpilot/commit/3efe903), 2026-08-09), and the ordinals of the fixed three-part structure (`**1. Kursbewegung**`) and ambiguous forms like `41,828` were read as invented figures ([`ac729d7`](https://github.com/timur-us/forecastpilot/commit/ac729d7), 2026-09-02). The example above contains exactly that pattern — `**1. Price movement**` — which is why the guard counts 8 numbers rather than 11. It also missed a case: on a cache hit it reported `passed` for commentary that belonged to older prices, because the stored evaluation was returned along with the stored text; since [#5](https://github.com/timur-us/forecastpilot/pull/5) the cache key includes the numbers the text cites and the check is recomputed on every hit. These cases, like the rest of the behaviour, are pinned down by the 129 offline tests.
+The numbers-match guard has been wrong in both directions. Early on it produced false positives on German commentary: a decimal such as `18,6936` was split at the third digit ([`3efe903`](https://github.com/timur-us/forecastpilot/commit/3efe903), 2026-08-09), and the ordinals of the fixed three-part structure (`**1. Kursbewegung**`) and ambiguous forms like `41,828` were read as invented figures ([`ac729d7`](https://github.com/timur-us/forecastpilot/commit/ac729d7), 2026-09-02). The example above contains exactly that pattern — `**1. Price movement**` — which is why the guard counts 8 numbers rather than 11. It also missed a case: on a cache hit it reported `passed` for commentary that belonged to older prices, because the stored evaluation was returned along with the stored text; since [#5](https://github.com/timur-us/forecastpilot/pull/5) the cache key includes the numbers the text cites and the check is recomputed on every hit. These cases, like the rest of the behaviour, are pinned down by the 148 offline tests.
 
 ### Evaluation
 
 The guard checks one response at a time. `evals/` turns it into a suite that measures the commentary against what the prompt demands, offline and per prompt version:
 
 - **Golden set** — 20 synthetic payloads in `evals/cases/` (10 English, 10 German): `beats_naive` true and false, horizons 5, 30 and 90, a DAX level above 10,000, a price below 1, two cases without a backtest in the form the API returns, negative drift, a flat forecast, a very high MAPE, a four-decimal metric and two hairline verdicts. No market data is involved.
-- **Seven metrics** in `evals/score.py`, each pass/fail with a reason: `numbers_match` (the guard: no number that is not in the data), `coverage` (part 1 cites the last close, the forecast start and the forecast end: the guard's counterpart), `language`, `structure`, `verdict` (part 2 names the naive baseline and does not contradict `beats_naive`; without a backtest it says so and cites no metric figure), `length` (150 words including labels and disclaimer) and `complete` (`stop_reason: end_turn`). What the prompt leaves open — the form of the labels, how words are counted, number formats, the wording of the verdict, a title line — is never counted as a model failure; the scorer records it as a hint under twelve documented spec gaps, the input for the next prompt revision.
+- **Eleven metrics** in `evals/score.py`, each pass/fail with a reason. Seven contract metrics measure what the prompt demands: `numbers_match` (the guard: no number that is not in the data), `coverage` (part 1 cites the last close, the forecast start and the forecast end: the guard's counterpart), `language`, `structure`, `verdict` (part 2 names the naive baseline and does not contradict `beats_naive`; without a backtest it says so and cites no metric figure), `length` (150 words including labels and disclaimer) and `complete` (`stop_reason: end_turn`). What the prompt leaves open — the form of the labels, how words are counted, number formats, the wording of the verdict, a title line — is never counted as a model failure; the scorer records it as a hint under twelve documented spec gaps, the input for the next prompt revision. Four communication metrics measure weaknesses the baseline showed within the contract: `jargon_free` (no `beats_naive`, `True`/`False` or dict keys in the prose), `locale_numbers` (number format of the target language), `no_title_line` and `label_format` (each label a line of exactly `**Name**`, which the web app renders as a heading). They are metrics, not gates.
+- **Golden set and hold-out** — prompt rules are derived from the 20 golden cases only; a hold-out set of 6 cases in `evals/holdout/` (3 English, 3 German, one without backtest, one DAX-sized level) is only ever scored and reported separately.
 - **Recorded baseline** — `python -m evals.run --record --yes` generates three samples per case through the model step (`call_model`: the Anthropic API directly, cache bypassed) after printing the number of calls and the estimated cost; it never runs in CI. `python -m evals.run` scores the recorded files offline and writes `evals/results/<prompt_version>.md`.
 
-Baseline for prompt `2026-10-23.1`, recorded 2026-10-23 with Claude Sonnet 5.5: 20 cases × 3 samples = 60 samples, all complete, 0.33 USD (full report: [`evals/results/2026-10-23.1.md`](evals/results/2026-10-23.1.md)).
+Baseline for prompt `2026-10-23.1`, recorded 2026-10-23 and 2026-10-25 with Claude Sonnet 5.5: golden set 20 cases × 3 samples = 60 samples, hold-out 6 × 3 = 18, all complete, 0.44 USD, mean 474 output tokens per commentary (full report: [`evals/results/2026-10-23.1.md`](evals/results/2026-10-23.1.md)).
 
-| Metric | Samples | Cases (all 3 samples) |
-| --- | --- | --- |
-| numbers_match | 60/60 | 20/20 |
-| language | 60/60 | 20/20 |
-| structure | 60/60 | 20/20 |
-| verdict | 60/60 | 20/20 |
-| coverage | 60/60 | 20/20 |
-| length | 60/60 | 20/20 |
-| complete | 60/60 | 20/20 |
+| Metric | Group | Golden samples | Golden cases (all 3) | Hold-out cases (all 3) |
+| --- | --- | --- | --- | --- |
+| numbers_match | correctness | 60/60 | 20/20 | 6/6 |
+| language | contract | 60/60 | 20/20 | 6/6 |
+| structure | contract | 60/60 | 20/20 | 6/6 |
+| verdict | correctness | 60/60 | 20/20 | 6/6 |
+| coverage | correctness | 60/60 | 20/20 | 6/6 |
+| length | contract | 60/60 | 20/20 | 6/6 |
+| complete | correctness | 60/60 | 20/20 | 6/6 |
+| jargon_free | communication | 0/60 | 0/20 | 0/6 |
+| locale_numbers | communication | 47/60 | 15/20 | 3/6 |
+| no_title_line | communication | 57/60 | 17/20 | 6/6 |
+| label_format | communication | 20/60 | 3/20 | 0/6 |
 
-No failures; three English replies opened with a title line before part 1, recorded as a hint (G12). With three samples per case the suite shows instability, not statistical significance; a difference of one or two cases between prompt versions is noise and is reported as such. A clean baseline says that the current prompt is followed on these 20 cases, nothing about cases outside the set, and the heuristics have documented limits (a keyword-based verdict, a function-word language check).
+The contract holds on every sample. The communication metrics show what the contract does not cover: every reply echoes `beats_naive` as code, 13 of the 30 German replies use English number formats throughout, three replies open with a title line, and only 20 replies use the bold-only label line the web app renders as a heading. With three samples per case the suite shows instability, not statistical significance; a difference of one or two cases between prompt versions is noise and is reported as such. A clean baseline says that the current prompt is followed on these 20 cases, nothing about cases outside the set, and the heuristics have documented limits (a keyword-based verdict, a function-word language check).
 
-The pytest in `tests/test_evals_suite.py` is the CI gate for the scorer itself: it pins the two replies shown in this README as clean samples, shows every metric detecting its failure case on artificial answers, and rebuilds the committed report from the recorded files. The pass rates of a baseline are a metric, not a gate: a prompt change is judged by comparing two reports, and `prompt_version` on every commentary block ties a report to the prompt it measures.
+The pytest in `tests/test_evals_suite.py` is the CI gate for the scorer itself: it pins the two replies shown in this README as clean samples, shows every metric detecting its failure case on artificial answers, and rebuilds the committed report from the recorded files. A prompt change is judged by comparing two reports under a rule written into every report before a second version existed: a version is better when the four communication metrics rise and no correctness metric (`numbers_match`, `verdict`, `coverage`, `complete`) falls. The correctness metrics are also a regression gate in CI: the newest recorded version must not pass fewer cases than the previous one. Everything else is a metric, not a gate. `prompt_version` on every commentary block ties a report to the prompt it measures.
 
 ### Errors
 
