@@ -42,14 +42,14 @@ flowchart TB
     L --> A["Anthropic API"]
 ```
 
-Infrastructure: Azure Container Apps (scale 0–10 replicas, single-revision mode), image in Azure Container Registry, container console logs in Log Analytics. Every commentary response carries its own token, cost, eval, truncation and prompt-version fields.
+Infrastructure: Azure Container Apps (scale 0–10 replicas, single-revision mode), image in Azure Container Registry, container console logs in Log Analytics, all described as Bicep in `infra/` (see [Infrastructure](#infrastructure)). Every commentary response carries its own token, cost, eval, truncation and prompt-version fields.
 
 Deployment pipeline (`.github/workflows/ci.yml`):
 
 ```mermaid
 flowchart LR
     P["Push to main"] --> T["ruff + pytest"] --> B["Docker build"]
-    B --> R["Push to ACR<br/>tag = commit SHA"] --> U["az containerapp update"]
+    B --> R["Push to ACR<br/>tag = commit SHA"] --> U["az deployment group create<br/>infra/ · scope=app"]
     T --> G["GitHub Pages<br/>web/ changed"]
 ```
 
@@ -186,7 +186,7 @@ The pytest in `tests/test_evals_suite.py` is the CI gate for the scorer itself: 
 
 ## Configuration
 
-Copy `.env.example` to `.env` for local runs. In production the key is an Azure Container App secret; model and pricing are versioned in the deploy job of `.github/workflows/ci.yml` and applied on every deploy.
+Copy `.env.example` to `.env` for local runs. In production the key is a Container App secret, written on every deploy from the GitHub secret `ANTHROPIC_API_KEY`; model, pricing, proxy trust and CORS are versioned in `infra/main.bicepparam` and applied on every deploy.
 
 | Variable | Default | Meaning |
 | --- | --- | --- |
@@ -244,13 +244,58 @@ docker run --env-file .env -p 8000:8000 forecastpilot
 
 ## Deployment
 
-Every push to `main` and every pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff format --check` and `pytest` on Python 3.11, then a Docker build. On `main` a `changes` job diffs the push against the previous head and gates two deployments: when `app/`, `requirements.txt`, the `Dockerfile`, `.dockerignore` or the workflow changed, the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az containerapp update`, which also sets the model, pricing, proxy-trust and CORS variables (a new revision takes traffic once it is healthy; the previous one serves until then); when `web/` changed, the page is published to GitHub Pages. Documentation-only changes deploy nothing; a manual run (`workflow_dispatch`) can redeploy either part.
+Every push to `main` and every pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff format --check` and `pytest` on Python 3.11, then a Docker build. On `main` a `changes` job diffs the push against the previous head and gates two deployments: when `app/`, `infra/`, `requirements.txt`, the `Dockerfile` or `.dockerignore` changed, the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az deployment group create` against `infra/main.bicep` (see [Infrastructure](#infrastructure); a new revision takes traffic once it is healthy, the previous one serves until then); when `web/` changed, the page is published to GitHub Pages. Documentation-only changes deploy nothing, and neither do changes to the workflow itself, which carries no deployed values; a manual run (`workflow_dispatch`) can redeploy either part.
+
+## Infrastructure
+
+The Azure setup is described as Bicep in `infra/`, matching what runs in production (resource group `forecastpilot-rg`, Germany West Central):
+
+- `infra/modules/shared.bicep`: the Log Analytics workspace, the container registry (admin user on, because CI pushes and the app pulls with it) and the Container Apps environment.
+- `infra/modules/app.bicep`: the Container App with ingress, scaling, the environment variables and both secrets.
+- `infra/main.bicep` chooses what a deployment touches with `scope`: `app` (the default) writes only the Container App and references the registry and the environment as existing resources; `shared` and `all` also write the shared resources and are only run by hand. Every push deploys `scope=app`, so a push can change one resource and nothing else.
+- `infra/main.bicepparam` holds the production values and is the single source for model, pricing, proxy trust, CORS and scale. A rebuild and every push read the same file; the workflow only supplies the image tag and the API key, as environment variables the parameter file reads. Values kept in the workflow would only apply to pushes, so a rebuild from the template would silently differ.
+
+The app has two secrets, and both are written on every deployment, because a deployment that leaves a secret out removes it: `anthropic-api-key` from the GitHub secret `ANTHROPIC_API_KEY` (a secure parameter; an empty value fails before anything reaches Azure), and the registry password from `listCredentials()` of the existing registry. `what-if` cannot compare secret values, because Azure never returns them, but it does report a secret that would be removed. The deploy job prints a `what-if` before every `create`, and a pull request that changes `infra/` shows its `what-if` before it is merged.
+
+To rebuild the environment from the template (with the GitHub secret set and an account allowed to deploy to the resource group):
+
+```bash
+export ANTHROPIC_API_KEY=...   # the same value as the GitHub secret, never typed into the portal
+DEPLOY_SCOPE=shared IMAGE_TAG=unused az deployment group create -g forecastpilot-rg -f infra/main.bicep -p infra/main.bicepparam
+docker build -t ca06d26caabdacr.azurecr.io/forecastpilot:$(git rev-parse HEAD) . && docker push ca06d26caabdacr.azurecr.io/forecastpilot:$(git rev-parse HEAD)
+DEPLOY_SCOPE=app IMAGE_TAG=$(git rev-parse HEAD) az deployment group create -g forecastpilot-rg -f infra/main.bicep -p infra/main.bicepparam
+```
+
+Run each `create` as `what-if` first. A new registry issues new admin credentials (update the GitHub secrets `ACR_USERNAME` and `ACR_PASSWORD`), a new environment gets a new default domain (update `API_BASE` in `web/app.js`, the page's CSP and the links in this README), and the deploy service principal needs its role on a new resource group, which is assigned by hand.
+
+### Rotating the API key
+
+1. Put the new value into the GitHub secret `ANTHROPIC_API_KEY`, and nowhere else.
+2. Run the workflow by hand (`workflow_dispatch` with `deploy_api`); it writes the secret into the app.
+3. Restart the running revision, because a changed secret does not create a new revision:
+
+```bash
+az containerapp revision restart -n forecastpilot -g forecastpilot-rg \
+  --revision "$(az containerapp show -n forecastpilot -g forecastpilot-rg --query properties.latestRevisionName -o tsv)"
+```
+
+Never change the key in the Azure portal: the next deployment writes the GitHub secret's value again and overwrites it.
+
+Observed on 2026-10-19 (activity log and container logs): a write to the app at 17:45:28 UTC created no new revision (the system log reads "No new revision was provisioned"). A restart at 17:47:45 succeeded but started no container, because the revision was scaled to zero. The next cold start at 18:03:55 started a fresh container, and its first commentary request reached the Anthropic API at 18:04:32 (it then failed on the thinking-block bug fixed in [#2](https://github.com/timur-us/forecastpilot/pull/2), after the API had accepted the key). So at zero replicas the restart has no effect and the next cold start loads the current value. The logs show neither the content nor the value of the secret; that the write changed the key rests on the maintainer's record.
+
+### Open
+
+- Image pull with the app's managed identity instead of the registry admin password.
+- OIDC (workload identity federation) instead of a client secret for the CI login to Azure; the current secret expires on 2027-08-09.
+- Switching the registry admin user off, once neither CI nor the app needs it.
+
+Project 2 starts with all three from the beginning.
 
 ## Roadmap
 
 - [x] **W1–2** Core service local — API, forecasting, LLM layer, tests, Docker
 - [x] **W3** Azure Container Apps deploy
-- [ ] **W3** Infrastructure as code (Bicep)
+- [x] **W3** Infrastructure as code (Bicep) — `infra/`, deployed on every push
 - [x] **W4** CI/CD — GitHub Actions deploys on push to `main`
 - [x] **W5** Observability — token/cost metrics, numbers-match guard on every commentary response
 - [x] **Eval suite** — golden set (20 cases) and hold-out (6), 11 metrics, recorded baseline per prompt version, regression gate in CI
