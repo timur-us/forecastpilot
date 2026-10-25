@@ -31,6 +31,21 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -q
+      # No Azure login needed: downloads the pinned Bicep CLI, then compiles
+      # and lints the template and the parameter file (the single source).
+      # Pull requests get no what-if here; see README, "Infrastructure".
+      - name: Bicep build and lint
+        env:
+          # Placeholders so main.bicepparam compiles; not secrets, and the
+          # compiled output goes to /dev/null.
+          IMAGE_TAG: ci
+          ANTHROPIC_API_KEY: ci-placeholder
+        run: |
+          az bicep install --version v0.48.1
+          az bicep build --file infra/main.bicep --stdout > /dev/null
+          az bicep lint --file infra/main.bicep
+          az bicep build-params --file infra/main.bicepparam --stdout > /dev/null
+          az bicep lint --file infra/main.bicepparam
 
   docker-build:
     needs: lint-test
@@ -71,8 +86,11 @@ jobs:
           printf 'changed files:\n%s\n' "$files"
           api=false; web=false
           # What goes into the image or the rollout: app code, runtime pins,
-          # the Dockerfile and its ignore list, and this workflow (env values).
-          echo "$files" | grep -qE '^(app/|requirements\.txt$|Dockerfile$|\.dockerignore$|\.github/workflows/ci\.yml$)' && api=true
+          # the Dockerfile and its ignore list, and the infrastructure
+          # template with its parameters (model, pricing, scale). This
+          # workflow carries no deployed values, so editing it deploys
+          # nothing; a changed deploy job goes out with workflow_dispatch.
+          echo "$files" | grep -qE '^(app/|infra/|requirements\.txt$|Dockerfile$|\.dockerignore$)' && api=true
           echo "$files" | grep -qE '^web/' && web=true
           echo "api=$api" >> "$GITHUB_OUTPUT"; echo "web=$web" >> "$GITHUB_OUTPUT"
           echo "api=$api web=$web"
@@ -84,39 +102,67 @@ jobs:
     needs: [lint-test, docker-build, changes]
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
-    # Model and pricing used in production, versioned here and applied on
-    # every deploy. The API key stays an Azure secret (anthropic-api-key)
-    # referenced by the existing ANTHROPIC_API_KEY variable of the app.
+    # One deployment at a time: overlapping runs would write the same nested
+    # deployment. A waiting run is not cancelled halfway through an ARM call.
+    concurrency:
+      group: deploy-api
+      cancel-in-progress: false
+    # Rolls out infra/main.bicep with scope=app: only the Container App is
+    # written; registry, logs and environment are referenced as existing.
+    # Model, pricing, proxy trust, CORS and the replica limit come from
+    # infra/main.bicepparam (the single source). This job supplies only the
+    # image tag, the API key and DEPLOY_SCOPE=app (set explicitly, so a push
+    # never widens the scope), as environment variables that main.bicepparam
+    # reads, so the key never appears on a command line.
     env:
-      ANTHROPIC_MODEL: claude-sonnet-5-5
-      ANTHROPIC_PRICE_INPUT_PER_MTOK: "2.0"
-      ANTHROPIC_PRICE_OUTPUT_PER_MTOK: "10.0"
-      # Container Apps ingress network; its X-Forwarded-For identifies the caller.
-      TRUSTED_PROXY_CIDRS: 100.64.0.0/10
-      # Browser origin of the web UI on GitHub Pages (origin only, no path).
-      CORS_ORIGINS: https://timur-us.github.io
+      IMAGE: ca06d26caabdacr.azurecr.io/forecastpilot:${{ github.sha }}
+      IMAGE_TAG: ${{ github.sha }}
+      DEPLOY_SCOPE: app
     steps:
+      - name: Require the API key secret
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::error::GitHub secret ANTHROPIC_API_KEY is empty or missing; nothing was deployed."
+            exit 1
+          fi
       - uses: actions/checkout@v4
-      - name: Build image
-        run: docker build -t ca06d26caabdacr.azurecr.io/forecastpilot:${{ github.sha }} .
       - name: Log in to ACR
         run: echo "${{ secrets.ACR_PASSWORD }}" | docker login ca06d26caabdacr.azurecr.io -u ${{ secrets.ACR_USERNAME }} --password-stdin
-      - name: Push image
-        run: docker push ca06d26caabdacr.azurecr.io/forecastpilot:${{ github.sha }}
+      # The tag is the commit SHA and is never overwritten: a re-run or a
+      # workflow_dispatch (for example a key rotation) deploys the image that
+      # was already pushed for this commit. If the check itself fails, the
+      # image is built and pushed as before.
+      - name: Build and push image
+        run: |
+          if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+            echo "$IMAGE already exists in the registry; not rebuilt."
+          else
+            docker build -t "$IMAGE" .
+            docker push "$IMAGE"
+          fi
       - uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-      - name: Deploy to Container App
+      - name: Install Bicep
+        run: az bicep install --version v0.48.1
+      # Printed for the record, not a gate: create runs whatever this
+      # reports. Pull requests have no Azure login; a PR that changes infra/
+      # carries a what-if run by hand in its description.
+      - name: what-if
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: az deployment group what-if -g forecastpilot-rg -f infra/main.bicep -p infra/main.bicepparam
+      - name: Deploy the Container App
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
-          az containerapp update \
-            -n forecastpilot -g forecastpilot-rg \
-            --image ca06d26caabdacr.azurecr.io/forecastpilot:${{ github.sha }} \
-            --set-env-vars \
-              "ANTHROPIC_MODEL=${{ env.ANTHROPIC_MODEL }}" \
-              "ANTHROPIC_PRICE_INPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_INPUT_PER_MTOK }}" \
-              "ANTHROPIC_PRICE_OUTPUT_PER_MTOK=${{ env.ANTHROPIC_PRICE_OUTPUT_PER_MTOK }}" \
-              "TRUSTED_PROXY_CIDRS=${{ env.TRUSTED_PROXY_CIDRS }}" \
-              "CORS_ORIGINS=${{ env.CORS_ORIGINS }}"
+          az deployment group create -g forecastpilot-rg -n "forecastpilot-$IMAGE_TAG" \
+            -f infra/main.bicep -p infra/main.bicepparam \
+            --query properties.provisioningState -o tsv
+          az containerapp show -n forecastpilot -g forecastpilot-rg \
+            --query "{revision:properties.latestRevisionName,image:properties.template.containers[0].image,secrets:properties.configuration.secrets[].name}" -o json
 
   # ---------------------------------------------------------------
   # Web UI — static page on GitHub Pages (served from web/)
