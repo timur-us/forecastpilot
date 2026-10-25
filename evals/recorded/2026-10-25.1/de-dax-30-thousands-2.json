@@ -1,0 +1,12 @@
+{
+  "case_id": "de-dax-30-thousands",
+  "sample": 2,
+  "prompt_version": "2026-10-25.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer letzte Schlusskurs des ^GDAXI lag bei 18.234,56. Die Prognose startet bei 18.260,10 und endet nach 30 Handelstagen bei 18.712,45, also über dem letzten Schlusskurs.\n\n**Modellgüte**\nIm Backtest über 30 Handelstage erreichte das Modell einen MAE von 198,7731 Punkten, die naive Baseline kam auf 231,0412. Der MAPE des Modells lag bei 1,12 Prozent. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDie Prognose beschreibt einen möglichen Verlauf auf Basis historischer Muster, keine gesicherte Entwicklung. Der Backtest zeigt nur, dass das Modell in der Vergangenheit genauer war als die Baseline; das garantiert keine künftige Treffsicherheit. Unerwartete Ereignisse, etwa Marktschocks oder Nachrichten, sind nicht abgebildet.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 788,
+  "output_tokens": 385,
+  "cost_usd": 0.005426,
+  "generated_at": "2026-10-25T05:36:23+00:00"
+}

@@ -695,9 +695,9 @@ def test_regression_gate_correctness_never_falls_between_prompt_versions():
     """The newest recorded prompt version must not lose a case on any
     correctness metric against the previous one. Communication metrics are
     reported, not gated. Never adjust the scorer to make this green."""
-    versions = run.recorded_versions()
+    versions = run.accepted_versions()
     if len(versions) < 2:
-        pytest.skip("one prompt version recorded; nothing to compare")
+        pytest.skip("fewer than two accepted prompt versions recorded")
     previous, newest = versions[-2], versions[-1]
     before = run.build_summary(previous)[2]
     after = run.build_summary(newest)[2]
@@ -706,6 +706,14 @@ def test_regression_gate_correctness_never_falls_between_prompt_versions():
         assert run.case_pass_rate(after, metric) >= run.case_pass_rate(
             before, metric
         ), f"{metric}: {newest} passes fewer cases than {previous}"
+
+
+def test_rejected_versions_stay_recorded_but_are_not_compared_against():
+    for version, reason in score.REJECTED_VERSIONS.items():
+        assert version in run.recorded_versions()
+        assert version not in run.accepted_versions()
+        markdown, _summary = run.build_report(version)
+        assert f"**Rejected.** {reason}" in markdown
 
 
 def test_version_keys_sort_by_date_then_counter():

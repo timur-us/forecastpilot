@@ -1,0 +1,12 @@
+{
+  "case_id": "de-dte-5-flat",
+  "sample": 2,
+  "prompt_version": "2026-10-25.2",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDie Aktie der Deutschen Telekom (DTE.DE) schloss zuletzt bei 29,17. Die Prognose beginnt bei 29,17 und endet nach 5 Handelstagen ebenfalls bei 29,17.\n\n**Modellgüte**\nIm Backtest über 5 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 0,3815, der mittlere prozentuale Fehler (MAPE) bei 1,31 Prozent. Die naive Baseline erreichte einen MAE von 0,354. Das Modell schlägt die naive Baseline nicht.\n\n**Einschränkung**\nDie Prognose deutet auf eine unveränderte Kursentwicklung hin, sie sagt jedoch keine Richtung voraus. Da das Modell die einfache Fortschreibung des letzten Kurses im Backtest nicht übertraf, sollte ihr kein zusätzlicher Informationswert zugeschrieben werden. Kursrisiken, Nachrichten und Marktumfeld bleiben unberücksichtigt.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 813,
+  "output_tokens": 408,
+  "cost_usd": 0.005706,
+  "generated_at": "2026-10-25T05:46:59+00:00"
+}

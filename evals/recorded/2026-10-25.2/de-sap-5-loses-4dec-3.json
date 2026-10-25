@@ -1,0 +1,12 @@
+{
+  "case_id": "de-sap-5-loses-4dec",
+  "sample": 3,
+  "prompt_version": "2026-10-25.2",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer letzte Schlusskurs der SAP-Aktie (SAP.DE) lag bei 230,15. Die Prognose startet bei 229,80 und endet nach 5 Handelstagen bei 228,30.\n\n**Modellgüte**\nIm Backtest über 5 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 6,88, der mittlere absolute prozentuale Fehler (MAPE) bei 2,95 Prozent. Die naive Baseline erreichte einen MAE von 6,37. Das Modell schlägt die naive Baseline nicht.\n\n**Einschränkung**\nDie Prognose ist wegen der fehlenden Überlegenheit gegenüber der einfachen Fortschreibung des letzten Kurses nur mit Vorsicht zu verwenden. Sie liefert keine belastbare Grundlage für Handelsentscheidungen und berücksichtigt weder Unternehmensnachrichten noch Marktereignisse. Die tatsächliche Kursentwicklung kann deutlich abweichen.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 813,
+  "output_tokens": 402,
+  "cost_usd": 0.005646,
+  "generated_at": "2026-10-25T05:47:33+00:00"
+}

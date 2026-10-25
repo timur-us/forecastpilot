@@ -1,0 +1,12 @@
+{
+  "case_id": "de-mdax-30-thousands",
+  "sample": 2,
+  "prompt_version": "2026-10-25.2",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer MDAX schloss zuletzt bei 26.412,78 Punkten. Die Prognose beginnt bei 26.450,30 Punkten und endet nach 30 Handelstagen bei 26.980,15 Punkten.\n\n**Modellgüte**\nDer Backtest über 30 Handelstage ergab einen mittleren absoluten Fehler (MAE) von 312,45 Punkten für das Modell, die naive Baseline kam auf 355,02 Punkte. Der mittlere prozentuale Fehler (MAPE) liegt bei 1,19 Prozent. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDie Prognose zeigt eine statistisch fortgeschriebene Entwicklung, keine gesicherte Vorhersage. Der Backtest deckt nur einen kurzen Zeitraum ab und garantiert keine ähnliche Genauigkeit in Zukunft. Unerwartete Ereignisse, etwa politische oder konjunkturelle Schocks, sind im Modell nicht berücksichtigt.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 818,
+  "output_tokens": 404,
+  "cost_usd": 0.005676,
+  "generated_at": "2026-10-25T10:53:18+00:00"
+}

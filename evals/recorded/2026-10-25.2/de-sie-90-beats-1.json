@@ -1,0 +1,12 @@
+{
+  "case_id": "de-sie-90-beats",
+  "sample": 1,
+  "prompt_version": "2026-10-25.2",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDie Siemens-Aktie (SIE.DE) schloss zuletzt bei 186,42. Die Prognose beginnt bei 186,90 und endet nach 90 Handelstagen bei 197,35.\n\n**Modellgüte**\nIm Backtest über 90 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 5,8842, der mittlere absolute prozentuale Fehler (MAPE) bei 3,16 Prozent. Die naive Baseline erreichte einen MAE von 6,9215. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDie Prognose zeigt einen Pfad, den das Modell aus historischen Kursmustern ableitet. Sie ist weder eine Garantie noch eine Zusage. Unerwartete Ereignisse, Marktschocks oder neue Unternehmensnachrichten sind nicht abgebildet. Ein guter Backtest-Wert belegt keine künftige Treffsicherheit.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 814,
+  "output_tokens": 382,
+  "cost_usd": 0.005448,
+  "generated_at": "2026-10-25T05:47:36+00:00"
+}

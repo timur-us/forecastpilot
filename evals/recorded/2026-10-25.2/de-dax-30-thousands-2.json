@@ -1,0 +1,12 @@
+{
+  "case_id": "de-dax-30-thousands",
+  "sample": 2,
+  "prompt_version": "2026-10-25.2",
+  "model": "claude-sonnet-5-5",
+  "text": "**Kursbewegung**\nDer DAX (^GDAXI) schloss zuletzt bei 18.234,56. Die Prognose startet bei 18.260,10 und endet nach 30 Handelstagen bei 18.712,45.\n\n**Modellgüte**\nIm Backtest über 30 Handelstage lag der mittlere absolute Fehler (MAE) des Modells bei 198,77, der MAE der naiven Baseline bei 231,04. Der mittlere prozentuale Fehler (MAPE) des Modells betrug 1,12 Prozent. Das Modell schlägt die naive Baseline.\n\n**Einschränkung**\nDie Prognose zeigt einen Modellpfad, keine gesicherte Entwicklung. Der Backtest bezieht sich nur auf einen vergangenen Zeitraum und garantiert keine ähnliche Genauigkeit in der Zukunft. Unerwartete Ereignisse, etwa geldpolitische oder geopolitische Entwicklungen, sind im Modell nicht abgebildet. Die Ergebnisse sollten nur als ein Baustein unter mehreren betrachtet werden.\n\nBildungsanalyse — keine Anlageberatung.",
+  "stop_reason": "end_turn",
+  "input_tokens": 818,
+  "output_tokens": 418,
+  "cost_usd": 0.005816,
+  "generated_at": "2026-10-25T05:46:49+00:00"
+}

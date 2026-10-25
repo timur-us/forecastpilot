@@ -1,0 +1,12 @@
+{
+  "case_id": "en-msft-90-loses",
+  "sample": 3,
+  "prompt_version": "2026-10-25.1",
+  "model": "claude-sonnet-5-5",
+  "text": "**Price movement**\nMSFT last closed at 512.33. The forecast starts slightly higher at 513.10 and ends at 541.75 after 90 trading days.\n\n**Model quality**\nOver a 90-day backtest horizon, the model's MAE was 18.4402 and its MAPE was 3.52%. The naive baseline's MAE was 15.9027, so it was more accurate. The model does not beat the naive baseline.\n\n**Interpretation**\nThe forecast points to a gradual rise over the period, but its backtest record does not justify treating the end level as a reliable target. A simple no-change assumption has historically done better. The forecast does not account for earnings, policy shifts or other unexpected events, and it should be treated as one scenario rather than a prediction.\n\nEducational analysis — not investment advice.",
+  "stop_reason": "end_turn",
+  "input_tokens": 782,
+  "output_tokens": 262,
+  "cost_usd": 0.004184,
+  "generated_at": "2026-10-25T05:38:53+00:00"
+}

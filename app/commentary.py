@@ -40,24 +40,45 @@ def describe_llm_error(exc: Exception) -> str:
 # Labels the prompt that produced a commentary block: SYSTEM plus the user
 # turn built by user_prompt. A date plus a counter; bump it with every edit
 # to either text so recorded evaluation results stay attributable to one
-# prompt. This first label marks the start of versioning: the text itself
-# has not changed since 2026-08-09 (d3e40aa).
-PROMPT_VERSION = "2026-10-23.1"
+# prompt. 2026-10-23.1 was the first label (text unchanged since 2026-08-09,
+# d3e40aa); 2026-10-25.1 added the rules below (labels, verdict sentences,
+# number format, no code, no title line) and was rejected: English replies
+# computed the change against the last close. 2026-10-25.2 adds one rule
+# for part 1: name the three figures, compute nothing.
+PROMPT_VERSION = "2026-10-25.2"
 
 SYSTEM = (
     "You are a markets analyst writing short, factual commentary for a management "
-    "audience. Write in exactly three parts, in this fixed order:\n"
-    "1. Kursbewegung / Price movement — last close vs. the forecast start and end.\n"
-    "2. Modellgüte / Model quality — backtest accuracy, explicitly stating whether "
-    "the model beats the naive baseline (beats_naive). If beats_naive is not present "
-    "in the data, say the backtest could not be computed — do not guess.\n"
-    "3. Einschränkung / Interpretation — what the forecast does and does not imply.\n"
-    "Hard rule: use ONLY numbers that appear in the data given to you. Never invent, "
-    "estimate, or round to a figure that isn't given.\n"
-    "Maximum 150 words total. Write the entire commentary — including section "
-    "labels — in the requested language; do not mix languages.\n"
-    "End with the disclaimer in the requested language: "
-    "'Educational analysis — not investment advice.' in English, or "
+    "audience.\n"
+    "Structure: exactly three parts in this order, nothing before the first label "
+    "and nothing after the disclaimer. Each label is a line of its own in bold, "
+    "exactly as given, without numbering or colon:\n"
+    "English: **Price movement**, **Model quality**, **Interpretation**\n"
+    "German: **Kursbewegung**, **Modellgüte**, **Einschränkung**\n"
+    "Price movement: name the last close, the forecast start and the forecast "
+    "end. Do not compute differences, changes or percentages; cite only figures "
+    "given in the data.\n"
+    "Model quality: the backtest accuracy, then the verdict as exactly one of "
+    "these sentences:\n"
+    "English: 'The model beats the naive baseline.' / 'The model does not beat "
+    "the naive baseline.' / 'No backtest was possible.'\n"
+    "German: 'Das Modell schlägt die naive Baseline.' / 'Das Modell schlägt die "
+    "naive Baseline nicht.' / 'Ein Backtest war nicht möglich.'\n"
+    "Use the first when beats_naive is true, the second when it is false, the "
+    "third when the data has no beats_naive; then cite no error figures and do "
+    "not guess.\n"
+    "Interpretation: what the forecast does and does not imply.\n"
+    "Hard rule: use ONLY numbers that appear in the data given to you. Never "
+    "invent, estimate, or round to a figure that isn't given. Write numbers in "
+    "the conventions of the requested language: German with a decimal comma and "
+    "a point as thousands separator (18.234,56; 6,88), English with a decimal "
+    "point and a comma as thousands separator (18,234.56; 6.88).\n"
+    "Write the entire commentary, labels included, in the requested language; do "
+    "not mix languages. Write plain prose for people: do not quote field names "
+    "or code from the data (no beats_naive, no True or False, no mae_model); "
+    "say MAE, MAPE and backtest in words.\n"
+    "Maximum 150 words total. The last line is the disclaimer in the requested "
+    "language: 'Educational analysis — not investment advice.' in English, or "
     "'Bildungsanalyse — keine Anlageberatung.' in German."
 )
 
@@ -163,9 +184,8 @@ def generate_commentary(
     Cached for the rest of the UTC day per (ticker, language, horizon) and
     the numbers the text cites — see app.cache. On a cache hit the numbers
     check runs against the current payload, so `eval` always describes the
-    response it is part of. The key carries no prompt version: the cache
-    lives in the process that holds PROMPT_VERSION, and a prompt change
-    ships as a new process with an empty cache.
+    response it is part of. The key includes PROMPT_VERSION, so a block
+    generated under an earlier prompt is never served under a later one.
     """
     horizon_days = len(forecast)
     payload = {
@@ -176,7 +196,7 @@ def generate_commentary(
         "horizon_days": horizon_days,
     }
     fingerprint = _fingerprint(last_close, forecast)
-    cached = cache.get(ticker, language, horizon_days, fingerprint)
+    cached = cache.get(ticker, language, horizon_days, fingerprint, PROMPT_VERSION)
     if cached is not None:
         # The cited numbers are unchanged; the backtest metrics may differ
         # slightly between fits, so judge the text against this payload.
@@ -205,5 +225,5 @@ def generate_commentary(
         "generated_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     if reply.stop_reason == "end_turn":
-        cache.set(ticker, language, horizon_days, fingerprint, result)
+        cache.set(ticker, language, horizon_days, fingerprint, PROMPT_VERSION, result)
     return {**result, "cached": False}
