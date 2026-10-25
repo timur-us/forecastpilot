@@ -31,12 +31,21 @@ jobs:
       - run: ruff check .
       - run: ruff format --check .
       - run: pytest -q
-      # Offline: compiles and lints the template, no Azure login needed.
+      # No Azure login needed: downloads the pinned Bicep CLI, then compiles
+      # and lints the template and the parameter file (the single source).
+      # Pull requests get no what-if here; see README, "Infrastructure".
       - name: Bicep build and lint
+        env:
+          # Placeholders so main.bicepparam compiles; not secrets, and the
+          # compiled output goes to /dev/null.
+          IMAGE_TAG: ci
+          ANTHROPIC_API_KEY: ci-placeholder
         run: |
           az bicep install --version v0.48.1
           az bicep build --file infra/main.bicep --stdout > /dev/null
           az bicep lint --file infra/main.bicep
+          az bicep build-params --file infra/main.bicepparam --stdout > /dev/null
+          az bicep lint --file infra/main.bicepparam
 
   docker-build:
     needs: lint-test
@@ -93,12 +102,18 @@ jobs:
     needs: [lint-test, docker-build, changes]
     if: github.ref == 'refs/heads/main' && needs.changes.outputs.api == 'true'
     runs-on: ubuntu-latest
+    # One deployment at a time: overlapping runs would write the same nested
+    # deployment. A waiting run is not cancelled halfway through an ARM call.
+    concurrency:
+      group: deploy-api
+      cancel-in-progress: false
     # Rolls out infra/main.bicep with scope=app: only the Container App is
     # written; registry, logs and environment are referenced as existing.
-    # Model, pricing, proxy trust, CORS and scale come from
+    # Model, pricing, proxy trust, CORS and the replica limit come from
     # infra/main.bicepparam (the single source). This job supplies only the
-    # image tag and the API key, both as environment variables that
-    # main.bicepparam reads, so the key never appears on a command line.
+    # image tag, the API key and DEPLOY_SCOPE=app (set explicitly, so a push
+    # never widens the scope), as environment variables that main.bicepparam
+    # reads, so the key never appears on a command line.
     env:
       IMAGE: ca06d26caabdacr.azurecr.io/forecastpilot:${{ github.sha }}
       IMAGE_TAG: ${{ github.sha }}
@@ -113,19 +128,28 @@ jobs:
             exit 1
           fi
       - uses: actions/checkout@v4
-      - name: Build image
-        run: docker build -t "$IMAGE" .
       - name: Log in to ACR
         run: echo "${{ secrets.ACR_PASSWORD }}" | docker login ca06d26caabdacr.azurecr.io -u ${{ secrets.ACR_USERNAME }} --password-stdin
-      - name: Push image
-        run: docker push "$IMAGE"
+      # The tag is the commit SHA and is never overwritten: a re-run or a
+      # workflow_dispatch (for example a key rotation) deploys the image that
+      # was already pushed for this commit. If the check itself fails, the
+      # image is built and pushed as before.
+      - name: Build and push image
+        run: |
+          if docker manifest inspect "$IMAGE" > /dev/null 2>&1; then
+            echo "$IMAGE already exists in the registry; not rebuilt."
+          else
+            docker build -t "$IMAGE" .
+            docker push "$IMAGE"
+          fi
       - uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
       - name: Install Bicep
         run: az bicep install --version v0.48.1
-      # Printed for the record, not a gate: the PR that changed infra/ showed
-      # the same what-if before it was merged.
+      # Printed for the record, not a gate: create runs whatever this
+      # reports. Pull requests have no Azure login; a PR that changes infra/
+      # carries a what-if run by hand in its description.
       - name: what-if
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}

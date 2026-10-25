@@ -1,7 +1,7 @@
 // Production values of the ForecastPilot environment. This file is the single
-// source for model, pricing, proxy trust, CORS and scale: the deploy job and
-// a rebuild both read it, the workflow only supplies the image tag and the
-// API key (README, "Infrastructure").
+// source for model, pricing, proxy trust, CORS and the replica limit: the
+// deploy job and a rebuild both read it, the workflow only supplies the image
+// tag, the API key and the scope (README, "Infrastructure").
 using 'main.bicep'
 
 // Set by the caller's environment; read when az compiles this file.

@@ -252,26 +252,27 @@ The Azure setup is described as Bicep in `infra/`, matching what runs in product
 
 - `infra/modules/shared.bicep`: the Log Analytics workspace, the container registry (admin user on, because CI pushes and the app pulls with it) and the Container Apps environment.
 - `infra/modules/app.bicep`: the Container App with ingress, scaling, the environment variables and both secrets.
-- `infra/main.bicep` chooses what a deployment touches with `scope`: `app` (the default) writes only the Container App and references the registry and the environment as existing resources; `shared` and `all` also write the shared resources and are only run by hand. Every push deploys `scope=app`, so a push can change one resource and nothing else.
-- `infra/main.bicepparam` holds the production values and is the single source for model, pricing, proxy trust, CORS and scale. A rebuild and every push read the same file; the workflow only supplies the image tag and the API key, as environment variables the parameter file reads. Values kept in the workflow would only apply to pushes, so a rebuild from the template would silently differ.
+- `infra/main.bicep` chooses what a deployment touches with `scope`: `app` (the default) writes only the Container App and references the registry and the environment as existing resources; `shared` writes only the Log Analytics workspace, the registry and the environment, and `all` writes those and then the Container App. Both run only by hand. Every push deploys `scope=app`, so a push can change one resource and nothing else.
+- `infra/main.bicepparam` holds the production values and is the single source for model, pricing, proxy trust, CORS and the replica limit (cooldown and polling interval are fixed in `infra/modules/app.bicep`). A rebuild and every push read the same file; the workflow only supplies the image tag, the API key and `scope=app`, as environment variables the parameter file reads. Values kept in the workflow would only apply to pushes, so a rebuild from the template would silently differ.
 
-The app has two secrets, and both are written on every deployment, because a deployment that leaves a secret out removes it: `anthropic-api-key` from the GitHub secret `ANTHROPIC_API_KEY` (a secure parameter; an empty value fails before anything reaches Azure), and the registry password from `listCredentials()` of the existing registry. `what-if` cannot compare secret values, because Azure never returns them, but it does report a secret that would be removed. The deploy job prints a `what-if` before every `create`, and a pull request that changes `infra/` shows its `what-if` before it is merged.
+The app has two secrets, and both are written on every deployment, because a deployment that leaves a secret out removes it: `anthropic-api-key` from the GitHub secret `ANTHROPIC_API_KEY` (a secure parameter; an empty value fails before anything reaches Azure), and the registry password from `listCredentials()` of the existing registry. `what-if` cannot compare secret values, because Azure never returns them, but it does report a secret that would be removed. The deploy job prints a `what-if` before every `create`; it is a record in the log, not a gate. Pull requests have no Azure login, so CI runs no `what-if` there: it compiles and lints the template and the parameter file, and a pull request that changes `infra/` carries a `what-if` run by hand against production in its description, as [#21](https://github.com/timur-us/forecastpilot/pull/21) does.
 
-To rebuild the environment from the template (with the GitHub secret set and an account allowed to deploy to the resource group):
+To rebuild the environment from the template, create the shared resources by hand (with an account allowed to deploy to the resource group):
 
 ```bash
-export ANTHROPIC_API_KEY=...   # the same value as the GitHub secret, never typed into the portal
-DEPLOY_SCOPE=shared IMAGE_TAG=unused az deployment group create -g forecastpilot-rg -f infra/main.bicep -p infra/main.bicepparam
-docker build -t ca06d26caabdacr.azurecr.io/forecastpilot:$(git rev-parse HEAD) . && docker push ca06d26caabdacr.azurecr.io/forecastpilot:$(git rev-parse HEAD)
-DEPLOY_SCOPE=app IMAGE_TAG=$(git rev-parse HEAD) az deployment group create -g forecastpilot-rg -f infra/main.bicep -p infra/main.bicepparam
+# Only if the resource group itself is gone; the template takes its region from the group.
+az group create -n forecastpilot-rg -l germanywestcentral
+# scope=shared skips the app module, so the placeholders reach nothing.
+DEPLOY_SCOPE=shared IMAGE_TAG=unused ANTHROPIC_API_KEY=unused az deployment group what-if -g forecastpilot-rg -f infra/main.bicep -p infra/main.bicepparam
+DEPLOY_SCOPE=shared IMAGE_TAG=unused ANTHROPIC_API_KEY=unused az deployment group create -g forecastpilot-rg -f infra/main.bicep -p infra/main.bicepparam
 ```
 
-Run each `create` as `what-if` first. A new registry issues new admin credentials (update the GitHub secrets `ACR_USERNAME` and `ACR_PASSWORD`), a new environment gets a new default domain (update `API_BASE` in `web/app.js`, the page's CSP and the links in this README), and the deploy service principal needs its role on a new resource group, which is assigned by hand.
+Never use a placeholder key with `scope=app` or `scope=all`: it would be written into the app. Then update the GitHub secrets `ACR_USERNAME` and `ACR_PASSWORD` (a new registry issues new admin credentials), give the deploy service principal its role on the resource group (assigned by hand), and run the workflow by hand on `main` (`workflow_dispatch` with `deploy_api`). It builds the image on an x64 runner (Container Apps runs only `linux/amd64` images), pushes it, prints the `what-if` and deploys `scope=app` with the key from the GitHub secret, so the key never leaves GitHub. A new environment gets a new default domain: update `API_BASE` in `web/app.js`, the page's CSP and the links in this README.
 
 ### Rotating the API key
 
 1. Put the new value into the GitHub secret `ANTHROPIC_API_KEY`, and nowhere else.
-2. Run the workflow by hand (`workflow_dispatch` with `deploy_api`); it writes the secret into the app.
+2. Run the workflow by hand on `main` (`workflow_dispatch` with `deploy_api`). It deploys the image already pushed for that commit, without rebuilding it, and writes the secret into the app.
 3. Restart the running revision, because a changed secret does not create a new revision:
 
 ```bash
@@ -281,7 +282,7 @@ az containerapp revision restart -n forecastpilot -g forecastpilot-rg \
 
 Never change the key in the Azure portal: the next deployment writes the GitHub secret's value again and overwrites it.
 
-Observed on 2026-10-19 (activity log and container logs): a write to the app at 17:45:28 UTC created no new revision (the system log reads "No new revision was provisioned"). A restart at 17:47:45 succeeded but started no container, because the revision was scaled to zero. The next cold start at 18:03:55 started a fresh container, and its first commentary request reached the Anthropic API at 18:04:32 (it then failed on the thinking-block bug fixed in [#2](https://github.com/timur-us/forecastpilot/pull/2), after the API had accepted the key). So at zero replicas the restart has no effect and the next cold start loads the current value. The logs show neither the content nor the value of the secret; that the write changed the key rests on the maintainer's record.
+Observed on 2026-10-19 (activity log and container logs): a write to the app at 17:45:28 UTC created no new revision (the system log reads "No new revision was provisioned"). A restart at 17:47:45 succeeded but started no container, because the revision was scaled to zero. The next cold start at 18:03:55 started a fresh container, and its first commentary request reached the Anthropic API at 18:04:32 (it then failed on the thinking-block bug fixed in [#2](https://github.com/timur-us/forecastpilot/pull/2), after the API had accepted the key). So at zero replicas the restart starts nothing. The logs show that a fresh container's request was accepted by the API, but not which key it used, and never the secret's value. That the write changed the key, and that the cold start therefore loaded the new value, rests on the maintainer's record.
 
 ### Open
 
