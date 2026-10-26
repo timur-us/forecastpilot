@@ -1,0 +1,15 @@
+# Accepted Trivy findings for the image scan in .github/workflows/ci.yml.
+#
+# Policy: nothing is ignored silently. Every entry needs
+#   id          the vulnerability ID (CVE-..., GHSA-...)
+#   statement   why it is accepted (not reachable here, fix not yet in the
+#               base image, ...)
+#   expired_at  a date (yyyy-mm-dd); from 00:00 UTC that day the finding
+#               fails CI again
+# Narrow an entry with `paths` or `purls` where possible. Example:
+#
+#   vulnerabilities:
+#     - id: CVE-0000-00000
+#       statement: Only reachable through a feature the service does not use.
+#       expired_at: 2026-12-31
+vulnerabilities: []

@@ -1,0 +1,10 @@
+{
+  "dependencies": [
+    {"name": "example-lib", "version": "1.0.0", "vulns": []},
+    {
+      "name": "example-local",
+      "skip_reason": "Dependency not found on PyPI and could not be audited: example-local (0.1.0)"
+    }
+  ],
+  "fixes": []
+}

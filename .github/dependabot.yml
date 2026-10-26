@@ -1,0 +1,29 @@
+# Weekly update PRs, one per ecosystem. SHA-pinned actions get no Dependabot
+# alerts, so these PRs are how action fixes arrive.
+version: 2
+updates:
+  - package-ecosystem: pip
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      pip:
+        patterns: ["*"]
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      github-actions:
+        patterns: ["*"]
+  # The base image in the Dockerfile. The first Trivy scan's findings came
+  # from it (setuptools in python:3.11-slim), not from requirements.txt.
+  # FROM is pinned by digest, so a new build of the tag arrives as a PR that
+  # updates the digest.
+  - package-ecosystem: docker
+    directory: "/"
+    schedule:
+      interval: weekly
+    groups:
+      docker:
+        patterns: ["*"]
