@@ -3,12 +3,16 @@
 
 # Python
 .venv/
+.venv-web/
 __pycache__/
 *.pyc
 .pytest_cache/
 .ruff_cache/
 dist/
 *.egg-info/
+
+# Browser test screenshots (tests/web)
+tests/web/artifacts/
 
 # OS / editor
 .DS_Store

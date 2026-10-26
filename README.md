@@ -131,7 +131,7 @@ Whether the model beats the naive baseline depends on the ticker, the window and
 
 ### What the guard caught — and what it missed
 
-The numbers-match guard has been wrong in both directions. Early on it produced false positives on German commentary: a decimal such as `18,6936` was split at the third digit ([`3efe903`](https://github.com/timur-us/forecastpilot/commit/3efe903), 2026-08-09), and the ordinals of the fixed three-part structure (`**1. Kursbewegung**`) and ambiguous forms like `41,828` were read as invented figures ([`ac729d7`](https://github.com/timur-us/forecastpilot/commit/ac729d7), 2026-09-02). The example above contains exactly that pattern — `**1. Price movement**` — which is why the guard counts 8 numbers rather than 11. It also missed a case: on a cache hit it reported `passed` for commentary that belonged to older prices, because the stored evaluation was returned along with the stored text; since [#5](https://github.com/timur-us/forecastpilot/pull/5) the cache key includes the numbers the text cites and the check is recomputed on every hit. On 2026-10-25 it read the 500 in "S&P 500" as a cited figure, in all three samples of one eval case; the fix is logged in the eval report with those samples as its evidence. These cases, like the rest of the behaviour, are pinned down by the 167 offline tests.
+The numbers-match guard has been wrong in both directions. Early on it produced false positives on German commentary: a decimal such as `18,6936` was split at the third digit ([`3efe903`](https://github.com/timur-us/forecastpilot/commit/3efe903), 2026-08-09), and the ordinals of the fixed three-part structure (`**1. Kursbewegung**`) and ambiguous forms like `41,828` were read as invented figures ([`ac729d7`](https://github.com/timur-us/forecastpilot/commit/ac729d7), 2026-09-02). The example above contains exactly that pattern — `**1. Price movement**` — which is why the guard counts 8 numbers rather than 11. It also missed a case: on a cache hit it reported `passed` for commentary that belonged to older prices, because the stored evaluation was returned along with the stored text; since [#5](https://github.com/timur-us/forecastpilot/pull/5) the cache key includes the numbers the text cites and the check is recomputed on every hit. On 2026-10-25 it read the 500 in "S&P 500" as a cited figure, in all three samples of one eval case; the fix is logged in the eval report with those samples as its evidence. These cases, like the rest of the behaviour, are pinned down by the 173 offline tests.
 
 ### Evaluation
 
@@ -233,6 +233,14 @@ Checks (the same ones CI runs):
 ruff check . && ruff format --check . && pytest -q
 ```
 
+Browser tests of the web app (headless Chromium against a mock API, screenshots in `tests/web/artifacts/`) use their own environment:
+
+```bash
+uv venv --python 3.11 .venv-web && uv pip install --python .venv-web -r tests/web/requirements.txt
+.venv-web/bin/python -m playwright install --only-shell chromium
+.venv-web/bin/python -m pytest tests/web -q
+```
+
 Runtime dependencies are pinned in `requirements.txt` to the versions running in production; `requirements-dev.txt` adds `pytest`, `httpx` and `ruff`. The tests run offline — market data and the Anthropic client are replaced by fakes.
 
 ## Docker
@@ -244,7 +252,7 @@ docker run --env-file .env -p 8000:8000 forecastpilot
 
 ## Deployment
 
-Every push to `main` and every pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff format --check` and `pytest` on Python 3.11, then a Docker build. On `main` a `changes` job diffs the push against the previous head and gates two deployments: when `app/`, `infra/`, `requirements.txt`, the `Dockerfile` or `.dockerignore` changed, the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az deployment group create` against `infra/main.bicep` (see [Infrastructure](#infrastructure); a new revision takes traffic once it is healthy, the previous one serves until then); when `web/` changed, the page is published to GitHub Pages. Documentation-only changes deploy nothing, and neither do changes to the workflow itself, which carries no deployed values; a manual run (`workflow_dispatch`) can redeploy either part.
+Every push to `main` and every pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff format --check` and `pytest` on Python 3.11, then a Docker build. Each of these runs also drives the web app in headless Chromium against a mock API (`web-test`) and uploads screenshots of every state as a CI artifact. On `main` a `changes` job diffs the push against the previous head and gates two deployments: when `app/`, `infra/`, `requirements.txt`, the `Dockerfile` or `.dockerignore` changed, the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az deployment group create` against `infra/main.bicep` (see [Infrastructure](#infrastructure); a new revision takes traffic once it is healthy, the previous one serves until then); when `web/` changed and the browser run did not fail, the page is published to GitHub Pages. Documentation-only changes deploy nothing, and neither do changes to the workflow itself, which carries no deployed values; a manual run (`workflow_dispatch`) can redeploy either part.
 
 ## Infrastructure
 
