@@ -1,14 +1,14 @@
 # Runtime dependencies, pinned to the versions running in production
 # (Container App revision forecastpilot--0000011, image built 2026-10-19 on
 # python:3.11-slim). Development tools live in requirements-dev.txt.
-fastapi==0.149.0
+fastapi==0.161.1
 uvicorn[standard]==0.54.0
 pydantic==2.14.1
-pandas==3.0.6
-numpy==2.4.6
+pandas==3.1.0
+numpy==2.5.4
 statsmodels==0.15.0
 yfinance==1.7.0
-anthropic==1.15.0
+anthropic==2.1.0
 python-dotenv==1.2.4
 slowapi==0.1.10
 limits==5.8.0
