@@ -29,4 +29,8 @@ param trustedProxyCidrs = '100.64.0.0/10'
 // Browser origin of the web UI on GitHub Pages (origin only, no path).
 param corsOrigins = 'https://timur-us.github.io'
 
-param maxReplicas = 10
+// One replica at most: the rate limit and the commentary cache live in
+// process memory, so each further replica would count its own limit
+// (multiplying what a client may call) and keep its own cache. The lower
+// bound stays 0 (scale to zero). README, "Infrastructure".
+param maxReplicas = 1
