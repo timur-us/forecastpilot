@@ -12,7 +12,7 @@ A FastAPI service that pulls market data, produces a statistical forecast with b
 
 ### [▶ Open the app](https://timur-us.github.io/forecastpilot/) · [API & Swagger](https://forecastpilot.mangotree-f644cfcc.germanywestcentral.azurecontainerapps.io/docs)
 
-The web app is a static page on GitHub Pages; the API runs on Azure Container Apps with scale-to-zero. The first request after a quiet period takes about 20 seconds while a container starts — the page shows what happens while you wait — and every request after that answers in well under a second.
+The web app is a static page on GitHub Pages; the API runs on Azure Container Apps and scales to zero after five minutes without a request. The first request after that wakes a new container and takes about half a minute or longer; the page shows the progress, and later requests do not wait (measurements under [Infrastructure](#infrastructure)).
 
 [![ForecastPilot web app showing the NVDA 30-day forecast, the backtest verdict, the Claude commentary and the numbers-match check](docs/screenshot-result.png)](https://timur-us.github.io/forecastpilot/)
 
@@ -25,6 +25,20 @@ GET /forecast/NVDA?horizon=30&commentary=true&language=en
 ## Why this exists
 
 Built to demonstrate end-to-end ML & GenAI engineering: model serving, containerization, CI/CD, cloud deployment (Azure), observability, and LLM output evaluation.
+
+## What this project shows, and what it does not
+
+Shown:
+
+- **Operations.** An LLM feature run as a service: infrastructure as code with a `what-if` before every deployment, a deploy job that cannot remove or empty a secret, dependency and image scanning, actions pinned to commits and the base image to its digest, and a browser run of the web app on every change.
+- **Measurement.** Every commentary carries its tokens, cost, stop reason and prompt version. An eval suite with a golden set, a hold-out set and a regression gate decides prompt changes, and every number in the text is checked against the data it cites.
+- **Honesty about LLM output.** The guard's misses are documented next to its catches, a prompt version that broke a correctness metric was rejected and stays in the record, and what holds by construction is marked apart from what the model achieved.
+
+Not shown:
+
+- **Forecasting skill.** Holt-Winters against a naive baseline, judged on one backtest window per request. A win or a loss on one ticker says nothing about the model.
+- **Distributed rate limits.** Limits and cache live in one process and start empty on every start; the hard cost ceiling is the Anthropic budget.
+- **Agents.** One structured model call per request, with no tools, no planning and no multi-step workflow.
 
 ## Architecture
 
@@ -83,7 +97,7 @@ Since prompt version `2026-10-25.3` the model returns the three parts as a struc
 
 ### Example
 
-`GET /forecast/NVDA?horizon=30&commentary=true&language=en` — a live response from the deployed service (2026-10-25, prompt `2026-10-25.3`, later than the screenshot above), shortened:
+`GET /forecast/NVDA?horizon=30&commentary=true&language=en` — a live response from the deployed service (2026-10-25, prompt `2026-10-25.3`), shortened:
 
 ```json
 {
@@ -255,6 +269,8 @@ docker run --env-file .env -p 8000:8000 forecastpilot
 
 Every push to `main` and every pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff format --check` and `pytest` on Python 3.11, then a Docker build. Each of these runs also drives the web app in headless Chromium against a mock API (`web-test`) and uploads screenshots of every state as a CI artifact. On `main` a `changes` job diffs the push against the previous head and gates two deployments: when `app/`, `infra/`, `requirements.txt`, the `Dockerfile` or `.dockerignore` changed, the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az deployment group create` against `infra/main.bicep` (see [Infrastructure](#infrastructure); a new revision takes traffic once it is healthy, the previous one serves until then); when `web/` changed and the browser run did not fail, the page is published to GitHub Pages. Documentation-only changes deploy nothing, and neither do changes to the workflow itself, which carries no deployed values; a manual run (`workflow_dispatch`) can redeploy either part.
 
+Changes reach `main` only through pull requests. A ruleset requires `lint-test`, `pip-audit`, `docker-build` and `web-test` to pass on a branch that is up to date with `main`, blocks force-pushes and deleting the branch, and has no bypass, not even for admins.
+
 ## Infrastructure
 
 The Azure setup is described as Bicep in `infra/`, matching what runs in production (resource group `forecastpilot-rg`, Germany West Central):
@@ -264,6 +280,8 @@ The Azure setup is described as Bicep in `infra/`, matching what runs in product
 - `infra/main.bicep` chooses what a deployment touches with `scope`: `app` (the default) writes only the Container App and references the registry and the environment as existing resources; `shared` writes only the Log Analytics workspace, the registry and the environment, and `all` writes those and then the Container App. Both run only by hand. Every push deploys `scope=app`, so a push can change one resource and nothing else.
 - The app runs on at most one replica per revision (`maxReplicas = 1`, lower bound 0 for scale to zero). The rate limit and the commentary cache live in process memory: with several replicas each would count its own limit, multiplying what a client may call, and keep its own cache. One replica avoids that only while it runs. Counters and cache start empty on every start: after scale to zero (300 seconds without a request, `cooldownPeriod`) and with every new revision, whose replica starts before the old one stops and then takes the traffic. The hourly limit therefore holds per running replica, not across restarts; the hard cost ceiling is the monthly budget in the Anthropic Console (see [Cost controls](#cost-controls)).
 - `infra/main.bicepparam` holds the production values and is the single source for model, pricing, proxy trust, CORS and the replica limit (cooldown and polling interval are fixed in `infra/modules/app.bicep`). A rebuild and every push read the same file; the workflow only supplies the image tag, the API key and `scope=app`, as environment variables the parameter file reads. Values kept in the workflow would only apply to pushes, so a rebuild from the template would silently differ.
+
+Cold starts: in two cold starts recorded in the platform's system logs (2026-10-25 and 2026-10-26), the new replica answered its first request about 27 and 29 seconds after it was scheduled, 6.6 and 7.8 seconds of that for the image pull. The time until the platform schedules the replica comes on top and is not in the logs.
 
 The app has two secrets, and both are written on every deployment, because a deployment that leaves a secret out removes it: `anthropic-api-key` from the GitHub secret `ANTHROPIC_API_KEY` (a secure parameter; an empty value fails before anything reaches Azure), and the registry password from `listCredentials()` of the existing registry. `what-if` cannot compare secret values, because Azure never returns them, but it does report a secret that would be removed. The deploy job prints a `what-if` before every `create`; it is a record in the log, not a gate. Pull requests have no Azure login, so CI runs no `what-if` there: it compiles and lints the template and the parameter file, and a pull request that changes `infra/` carries a `what-if` run by hand against production in its description, as [#21](https://github.com/timur-us/forecastpilot/pull/21) does.
 
@@ -317,10 +335,13 @@ A tag is a pointer that whoever controls the action's repository can move. On 20
 - [x] **W5** Observability — token/cost metrics, numbers-match guard on every commentary response
 - [x] **Eval suite** — golden set (20 cases) and hold-out (6), 11 metrics, recorded baseline per prompt version, regression gate in CI
 - [x] **Structured outputs** — measured with the eval suite: v1 → v2.1 → v3, before/after table above
-- [ ] **W5** Application Insights — moves to project 2
 - [x] **W6** Polish — live demo URL, architecture diagram
 - [x] **W6** Screenshots
 - [x] **Web app** — static page on GitHub Pages with the forecast, the verdict, the commentary and the guard result
+- [x] **Supply chain** — Dependabot, pip-audit, Trivy image scan, actions pinned to commits and the base image to its digest
+- [x] **Browser test in CI** — headless Chromium against a mock API, every state of the web app, screenshots as CI artifact
+- [ ] **Model selection by rolling backtest** (ETS, ARIMA, Theta against the naive baseline)
+- [ ] **W5** Application Insights — moves to project 2
 - [ ] **W7** RAG add-on — commentary grounded in uploaded reports, with citations — moves to project 2
 
 ## Cost controls
