@@ -12,7 +12,7 @@ A FastAPI service that pulls market data, produces a statistical forecast with b
 
 ### [▶ Open the app](https://timur-us.github.io/forecastpilot/) · [API & Swagger](https://forecastpilot.mangotree-f644cfcc.germanywestcentral.azurecontainerapps.io/docs)
 
-The web app is a static page on GitHub Pages; the API runs on Azure Container Apps with scale-to-zero. The first request after a quiet period takes about 20 seconds while a container starts — the page shows what happens while you wait — and every request after that answers in well under a second.
+The web app is a static page on GitHub Pages; the API runs on Azure Container Apps and scales to zero after 300 seconds without a request. The first request after that waits for a new container, and the page shows what happens while you wait. In two cold starts recorded in the platform's system logs (2026-10-25 and 2026-10-26), the new replica answered its first request about 27 and 29 seconds after it was scheduled, 6.6 and 7.8 seconds of that for the image pull. The time until the platform schedules the replica comes on top and is not in the logs. Requests to the running container skip that wait.
 
 [![ForecastPilot web app showing the NVDA 30-day forecast, the backtest verdict, the Claude commentary and the numbers-match check](docs/screenshot-result.png)](https://timur-us.github.io/forecastpilot/)
 
@@ -25,6 +25,20 @@ GET /forecast/NVDA?horizon=30&commentary=true&language=en
 ## Why this exists
 
 Built to demonstrate end-to-end ML & GenAI engineering: model serving, containerization, CI/CD, cloud deployment (Azure), observability, and LLM output evaluation.
+
+## What this project shows, and what it does not
+
+Shown:
+
+- **Operations.** An LLM feature run as a service: infrastructure as code with a `what-if` before every deployment, a deploy job that cannot remove or empty a secret, dependency and image scanning, actions and base image pinned by digest, and a browser run of the web app on every change.
+- **Measurement.** Every commentary carries its tokens, cost, stop reason and prompt version. An eval suite with a golden set, a hold-out set and a regression gate decides prompt changes, and every number in the text is checked against the data it cites.
+- **Honesty about LLM output.** The guard's misses are documented next to its catches, a prompt version that broke a correctness metric was rejected and stays in the record, and what holds by construction is marked apart from what the model achieved.
+
+Not shown:
+
+- **Forecasting skill.** Holt-Winters against a naive baseline, judged on one backtest window per request. A win or a loss on one ticker says nothing about the model.
+- **Distributed rate limits.** Limits and cache live in one process and start empty on every start; the hard cost ceiling is the Anthropic budget.
+- **Agents.** One structured model call per request, with no tools, no planning and no multi-step workflow.
 
 ## Architecture
 
@@ -83,7 +97,7 @@ Since prompt version `2026-10-25.3` the model returns the three parts as a struc
 
 ### Example
 
-`GET /forecast/NVDA?horizon=30&commentary=true&language=en` — a live response from the deployed service (2026-10-25, prompt `2026-10-25.3`, later than the screenshot above), shortened:
+`GET /forecast/NVDA?horizon=30&commentary=true&language=en` — a live response from the deployed service (2026-10-25, prompt `2026-10-25.3`), shortened:
 
 ```json
 {
@@ -255,6 +269,8 @@ docker run --env-file .env -p 8000:8000 forecastpilot
 
 Every push to `main` and every pull request runs `.github/workflows/ci.yml`: `ruff check`, `ruff format --check` and `pytest` on Python 3.11, then a Docker build. Each of these runs also drives the web app in headless Chromium against a mock API (`web-test`) and uploads screenshots of every state as a CI artifact. On `main` a `changes` job diffs the push against the previous head and gates two deployments: when `app/`, `infra/`, `requirements.txt`, the `Dockerfile` or `.dockerignore` changed, the image is pushed to Azure Container Registry tagged with the commit SHA and rolled out with `az deployment group create` against `infra/main.bicep` (see [Infrastructure](#infrastructure); a new revision takes traffic once it is healthy, the previous one serves until then); when `web/` changed and the browser run did not fail, the page is published to GitHub Pages. Documentation-only changes deploy nothing, and neither do changes to the workflow itself, which carries no deployed values; a manual run (`workflow_dispatch`) can redeploy either part.
 
+Changes reach `main` only through pull requests. A ruleset requires `lint-test`, `pip-audit`, `docker-build` and `web-test` to pass on a branch that is up to date with `main`, blocks force-pushes and deleting the branch, and has no bypass, not even for admins.
+
 ## Infrastructure
 
 The Azure setup is described as Bicep in `infra/`, matching what runs in production (resource group `forecastpilot-rg`, Germany West Central):
@@ -317,10 +333,13 @@ A tag is a pointer that whoever controls the action's repository can move. On 20
 - [x] **W5** Observability — token/cost metrics, numbers-match guard on every commentary response
 - [x] **Eval suite** — golden set (20 cases) and hold-out (6), 11 metrics, recorded baseline per prompt version, regression gate in CI
 - [x] **Structured outputs** — measured with the eval suite: v1 → v2.1 → v3, before/after table above
-- [ ] **W5** Application Insights — moves to project 2
 - [x] **W6** Polish — live demo URL, architecture diagram
 - [x] **W6** Screenshots
 - [x] **Web app** — static page on GitHub Pages with the forecast, the verdict, the commentary and the guard result
+- [x] **Supply chain** — Dependabot, pip-audit, Trivy image scan, actions pinned to commits and the base image to its digest
+- [x] **Browser test in CI** — headless Chromium against a mock API, every state of the web app, screenshots as CI artifact
+- [ ] **Model selection by rolling backtest** (ETS, ARIMA, Theta against the naive baseline)
+- [ ] **W5** Application Insights — moves to project 2
 - [ ] **W7** RAG add-on — commentary grounded in uploaded reports, with citations — moves to project 2
 
 ## Cost controls

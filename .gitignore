@@ -17,3 +17,7 @@ tests/web/artifacts/
 # OS / editor
 .DS_Store
 .vscode/
+
+# Claude Code: local settings and session worktrees
+.claude/settings.local.json
+.claude/worktrees/
