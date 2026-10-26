@@ -1,7 +1,12 @@
-# Weekly update PRs, one per ecosystem. SHA-pinned actions get no Dependabot
-# alerts, so these PRs are how action fixes arrive.
+# Weekly update PRs. SHA-pinned actions get no Dependabot alerts, so these
+# PRs are how action fixes arrive. Minor and patch updates are grouped per
+# ecosystem. pip majors come one PR each, because they need their own review
+# (an anthropic major needs its own eval run); GitHub Actions majors come
+# together in a separate github-actions-major PR.
 version: 2
 updates:
+  # Resolved against the Python in .python-version (3.11), the version the
+  # image and CI run; without it Dependabot uses its newest Python.
   - package-ecosystem: pip
     directory: "/"
     schedule:
@@ -9,6 +14,7 @@ updates:
     groups:
       pip:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
@@ -16,14 +22,24 @@ updates:
     groups:
       github-actions:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
+      github-actions-major:
+        patterns: ["*"]
+        update-types: ["major"]
   # The base image in the Dockerfile. The first Trivy scan's findings came
   # from it (setuptools in python:3.11-slim), not from requirements.txt.
   # FROM is pinned by digest, so a new build of the tag arrives as a PR that
-  # updates the digest.
+  # updates the digest. Newer Python tags are ignored: while one exists,
+  # Dependabot proposes the tag instead of a new digest (#24), and a Python
+  # upgrade changes the Dockerfile, .python-version and CI together, which
+  # is a decision of its own.
   - package-ecosystem: docker
     directory: "/"
     schedule:
       interval: weekly
+    ignore:
+      - dependency-name: python
+        update-types: ["version-update:semver-minor", "version-update:semver-major"]
     groups:
       docker:
         patterns: ["*"]
