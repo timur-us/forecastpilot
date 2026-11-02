@@ -2,7 +2,7 @@
 # digest of its multi-platform index so the build is reproducible on every
 # platform. Dependabot proposes new digests weekly (.github/dependabot.yml).
 # A Dockerfile comment cannot share the FROM line, so the tag is named here.
-FROM python:3.11-slim@sha256:b7a9e5f6a93d6d4a31f129bbd4bdee69efccb6ded0fb230d78aafaf37af98377
+FROM python:3.11-slim@sha256:673719e071ecf27434fd2635bbd8d00f49f4fdd81f243143438a42ced8bedf60
 
 WORKDIR /app
 
